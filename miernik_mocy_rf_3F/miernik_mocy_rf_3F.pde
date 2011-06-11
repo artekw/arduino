@@ -12,7 +12,7 @@ char str[150];
 #define PWRLEDPin 3
 #define RFLEDPin 2
 
-#define DELAY 2
+#define DELAY 1
 #define BPS 2000
 #define DEBUG true
 
@@ -23,7 +23,7 @@ void setup()
 {
   // emon
   emon.setPins(A0,A1,A2,A3); //V, I
-  emon.calibration(0.713432835, 1, 1, 1, 1); // V, I, F
+  emon.calibration(0.705701078, 0.098253783, 1, 1, 1.3, 1); // V, I, F
   
   // nadajnik RF
   vw_set_ptt_inverted(true);
