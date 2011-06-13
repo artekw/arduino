@@ -1,7 +1,6 @@
 /*
 Nadajnik stacji metrologicznej v0.1
 Written by Artur Wronowski <artur.wronowski@digi-led.pl>
-
 */
 
 #include <Wire.h>
@@ -17,29 +16,29 @@ Written by Artur Wronowski <artur.wronowski@digi-led.pl>
 // Analaogowe
 #define LDRPin 14
 #define BatteryPin 15
-#define WindPin 16
+//#define WindPin 16
 // Cyfrowe
 #define ACT_LED 3
-#define ONEWIRE_DATA 3
+//#define ONEWIRE_DATA 3
 #define MOSFET_GATE 7
 
 // Ustawienia
-#define SLEEP_TIME 6000
-#define ResLDR 10.0 //rezystor(10k) dla fotorezystora
-#define ObwAnem 0.25434 // metry
+#define SLEEP_TIME 30000
+//#define ResLDR 10.0 //rezystor(10k) dla fotorezystora
+//#define ObwAnem 0.25434 // metry
 
-#define ONEWIRE false
+//#define ONEWIRE false
 #define I2C true
 #define DEBUG false
 
 /*************************************************************/
 
-//MilliTimer sendTimer;
-EMPTY_INTERRUPT(WDT_vect);
+//EMPTY_INTERRUPT(WDT_vect);
+ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 
 void setup()
 {
-    rf12_initialize(1, RF12_433MHZ, 212);
+    rf12_initialize(2, RF12_433MHZ, 212);
     rf12_sleep(0);
 #if I2C
       Wire.begin();
@@ -53,22 +52,19 @@ void setup()
 
 void loop()
 {
-//  set_sleep_mode(SLEEP_MODE_IDLE);
-//  sleep_mode();
 #if I2C
     SHT21.readSensor();
     BMP085.readSensor();
 #endif
-  
-  pomiar.lobat = rf12_lowbat();  
-  getLDR();
-  battVol();
-  solarOn(getLDR());
 #if I2C
     getSHT21('h');
     getSHT21('t');
     getBMP085();
 #endif
+  pomiar.lobat = rf12_lowbat();  
+  getLDR();
+//  battVol();
+//  solarOn(getLDR());
 
   if (DEBUG) {
     transmissionRS();
@@ -78,7 +74,8 @@ void loop()
     transmissionRF();
   }
   // zzz...
-  for (byte i = 0; i < 15; i++ ) {
+  for (byte i = 0; i < 1; i++ ) {
     Sleepy::loseSomeTime(SLEEP_TIME);
   }
+
 }

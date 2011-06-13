@@ -1,11 +1,14 @@
 // pomiar napiecia przed stabilizatorem
 float battVol()
 {
- // mosfet(0);
-  pinMode(BatteryPin, INPUT);
+/*  if (!pinState(MOSFET_GATE)) 
+  {
+    mosfet(0);
+  }*/
+//  digitalWrite(BatteryPin, 1);
   int BatteryVal = analogRead(BatteryPin);
   pomiar.battvol = map(BatteryVal, 0, 1023, 0, 660);
-  pinMode(BatteryPin, OUTPUT);
+//  digitalWrite(BatteryPin, 0);
   return pomiar.battvol;
 }
 
@@ -33,13 +36,13 @@ float getBMP085()
 // pomiar nasłonecznienia
 int getLDR()
 {
-  pinMode(LDRPin, INPUT);
+//  digitalWrite(LDRPin, 1);
   int LDRVal = analogRead(LDRPin);
-  LDRVal = 1023 - LDRVal;
+//  LDRVal = 1023 - LDRVal;
 //  float vo = LDRVal * (3.3 / 1024.0);
 //  pomiar.light = (int)500/(ResLDR*((3.3-vo)/vo));
   pomiar.light = map((LDRVal), 0, 1023, 0, 255);
-  pinMode(LDRPin, OUTPUT);
+//  digitalWrite(LDRPin, 0);
   return pomiar.light;
 }  
 
@@ -61,7 +64,10 @@ static void transmissionRF()
   rf12_sleep(-1);
   while (!rf12_canSend())
     rf12_recvDone();
-  rf12_sendStart(0, &pomiar, sizeof pomiar, 2);
+  rf12_sendStart(0, &pomiar, sizeof pomiar);
+  rf12_sendWait(2);
+  set_sleep_mode(SLEEP_MODE_IDLE);
+  sleep_mode();
   rf12_sleep(0);
 }
 
@@ -102,7 +108,7 @@ static void mosfet(byte on) {
 
 static void solarOn(int ldr)
 {
-  if (ldr < 150) {
+  if (ldr < 220) {
     mosfet(0);
   }
   else

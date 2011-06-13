@@ -4,7 +4,7 @@
 
 #define JSON 1
 
-char str[200];
+char str[250];
 
 void setup () {
     Serial.begin(115200);
@@ -15,6 +15,9 @@ void setup () {
 void loop () {
     if (rf12_recvDone() && rf12_crc == 0 && rf12_len == sizeof pomiar) {
         memcpy(&pomiar, (byte*) rf12_data, sizeof pomiar);
+        // doszlo ?
+        if (RF12_WANTS_ACK)
+          rf12_sendStart(RF12_ACK_REPLY, 0, 0);
         if (JSON) {
           createJSON();
           transmissionRS();
