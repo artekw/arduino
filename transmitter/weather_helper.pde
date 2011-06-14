@@ -1,13 +1,13 @@
 // pomiar napiecia przed stabilizatorem
-float battVol()
+int battVol()
 {
-/*  if (!pinState(MOSFET_GATE)) 
+  if (!pinState(MOSFET_GATE)) 
   {
-    mosfet(0);
-  }*/
+     mosfet(0);
+  }
 //  digitalWrite(BatteryPin, 1);
   int BatteryVal = analogRead(BatteryPin);
-  pomiar.battvol = map(BatteryVal, 0, 1023, 0, 660);
+  pomiar.battvol = map((BatteryVal), 0, 1023, 0, 660);
 //  digitalWrite(BatteryPin, 0);
   return pomiar.battvol;
 }
@@ -38,9 +38,7 @@ int getLDR()
 {
 //  digitalWrite(LDRPin, 1);
   int LDRVal = analogRead(LDRPin);
-//  LDRVal = 1023 - LDRVal;
-//  float vo = LDRVal * (3.3 / 1024.0);
-//  pomiar.light = (int)500/(ResLDR*((3.3-vo)/vo));
+  LDRVal = 1023 - LDRVal;
   pomiar.light = map((LDRVal), 0, 1023, 0, 255);
 //  digitalWrite(LDRPin, 0);
   return pomiar.light;
@@ -61,14 +59,14 @@ float getTemp()
 // transmisja RF
 static void transmissionRF()
 {
+  activityLed(1);
   rf12_sleep(-1);
   while (!rf12_canSend())
     rf12_recvDone();
   rf12_sendStart(0, &pomiar, sizeof pomiar);
-  rf12_sendWait(2);
-  set_sleep_mode(SLEEP_MODE_IDLE);
-  sleep_mode();
+  rf12_sendWait(RADIO_SYNC_MODE);
   rf12_sleep(0);
+  activityLed(0);
 }
 
 static void transmissionRS()
@@ -106,15 +104,19 @@ static void mosfet(byte on) {
   delay(100);
 }
 
-static void solarOn(int ldr)
+static byte solarOn(int ldr)
 {
+  byte tmp;
   if (ldr < 220) {
     mosfet(0);
+    tmp = 0;
   }
   else
   {
     mosfet(1);
+    tmp = 1;
   }
+  return pomiar.solar = tmp;
 }
 
 static byte pinState(int pin)
