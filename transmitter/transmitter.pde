@@ -72,7 +72,7 @@ void loop()
   pomiar.lobat = rf12_lowbat();  
   getLDR();
   battVol();
-  solarOn(getLDR());
+  solar(getLDR());
   ++pomiar.seq;
 
   if (DEBUG) {

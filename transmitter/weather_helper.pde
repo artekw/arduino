@@ -5,10 +5,8 @@ int battVol()
   {
      mosfet(0);
   }
-//  digitalWrite(BatteryPin, 1);
   int BatteryVal = analogRead(BatteryPin);
   pomiar.battvol = map((BatteryVal), 0, 1023, 0, 660);
-//  digitalWrite(BatteryPin, 0);
   return pomiar.battvol;
 }
 
@@ -36,11 +34,9 @@ float getBMP085()
 // pomiar nasłonecznienia
 int getLDR()
 {
-//  digitalWrite(LDRPin, 1);
   int LDRVal = analogRead(LDRPin);
   LDRVal = 1023 - LDRVal;
   pomiar.light = map((LDRVal), 0, 1023, 0, 255);
-//  digitalWrite(LDRPin, 0);
   return pomiar.light;
 }  
 
@@ -126,7 +122,7 @@ static void mosfet(byte on) {
   delay(100);
 }
 
-static byte solarOn(int ldr)
+static byte solar(int ldr)
 {
   byte tmp;
   if (ldr < 220) {

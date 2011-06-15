@@ -3,7 +3,6 @@
 #include <weather_data.h>
 
 #define JSON 0
-#define ACT_LED 3
 #define NODEID 5
 
 char str[200];
@@ -17,7 +16,6 @@ void setup () {
 void loop () {
     if (rf12_recvDone() && rf12_crc == 0 && (rf12_hdr & RF12_HDR_CTL) == 0 && rf12_len == sizeof pomiar) {
         memcpy(&pomiar, (void*) rf12_data, sizeof pomiar);
-        // doszlo ?
         if (RF12_WANTS_ACK) {
           if (!JSON) {
             Serial.println("ack");
@@ -27,7 +25,7 @@ void loop () {
         rf12_recvDone();
         if (JSON) {
           createJSON();
-          transmissionRS();
+          transmissionRF();
         }
         else {
           Serial.print("WS ");
@@ -56,7 +54,7 @@ void loop () {
    
 }
 
-void transmissionRS()
+void transmissionRF()
 {
   Serial.println(str);
 }
