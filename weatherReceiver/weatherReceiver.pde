@@ -2,23 +2,29 @@
 #include <Ports.h>
 #include <weather_data.h>
 
-#define JSON 1
+#define JSON 0
 #define ACT_LED 3
+#define NODEID 5
 
 char str[200];
 
 void setup () {
     Serial.begin(115200);
     Serial.println("\n[WeatherStation]");
-    rf12_initialize('R', RF12_433MHZ, 212);
+    rf12_initialize(NODEID, RF12_433MHZ, 212);
 }
 
 void loop () {
-    if (rf12_recvDone() && rf12_crc == 0 && rf12_len == sizeof pomiar) {
-        memcpy(&pomiar, (byte*) rf12_data, sizeof pomiar);
+    if (rf12_recvDone() && rf12_crc == 0 && (rf12_hdr & RF12_HDR_CTL) == 0 && rf12_len == sizeof pomiar) {
+        memcpy(&pomiar, (void*) rf12_data, sizeof pomiar);
         // doszlo ?
-//        if (RF12_WANTS_ACK)
-//          rf12_sendStart(RF12_ACK_REPLY, 0, 0);
+        if (RF12_WANTS_ACK) {
+          if (!JSON) {
+            Serial.println("ack");
+          }
+          rf12_sendStart(RF12_ACK_REPLY, 0, 0);
+        }
+        rf12_recvDone();
         if (JSON) {
           createJSON();
           transmissionRS();

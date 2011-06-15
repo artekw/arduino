@@ -59,16 +59,39 @@ float getTemp()
 // transmisja RF
 static void transmissionRF()
 {
-  activityLed(1);
-  rf12_sleep(-1);
-  while (!rf12_canSend())
-    rf12_recvDone();
-  rf12_sendStart(0, &pomiar, sizeof pomiar);
-  rf12_sendWait(RADIO_SYNC_MODE);
-  rf12_sleep(0);
-  activityLed(0);
+  for (byte i = 0; i < RETRY; i++) {
+    rf12_sleep(-1);
+    while (!rf12_canSend())
+      rf12_recvDone();
+    rf12_sendStart(RF12_HDR_ACK, &pomiar, sizeof pomiar);
+    rf12_sendWait(RADIO_SYNC_MODE);
+    byte acked = waitForACK();
+    rf12_sleep(0);
+    
+    if (acked) {
+      #if DEBUG
+        Serial.print("ACK! ");
+        Serial.println((int) i);
+        Serial.println("-------");
+        delay(2);
+      #endif
+      return;
+    }
+  }
 }
 
+static byte waitForACK() {
+  MilliTimer t;
+  while (!t.poll(10)) {
+    if (rf12_recvDone() && rf12_crc == 0 )
+//        && rf12_hdr == (RF12_HDR_DST | RF12_HDR_CTL | NODEID))
+      return 1;
+     set_sleep_mode(SLEEP_MODE_IDLE);
+     sleep_mode();
+  }
+  return 0;
+}
+      
 static void transmissionRS()
 {
   activityLed(1);
@@ -88,7 +111,6 @@ static void transmissionRS()
   Serial.println(pomiar.battvol);
   Serial.print("MOSFET ");
   Serial.println(!pinState(MOSFET_GATE), DEC);
-  Serial.println("-------");
   activityLed(0);
 }
 

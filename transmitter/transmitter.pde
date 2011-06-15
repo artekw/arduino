@@ -23,14 +23,16 @@ Written by Artur Wronowski <artur.wronowski@digi-led.pl>
 #define MOSFET_GATE 7
 
 // Ustawienia
-#define SLEEP_TIME 60000
+#define SLEEP_TIME 15000
 #define RADIO_SYNC_MODE 2
+#define RETRY 5
+#define NODEID 1
 //#define ResLDR 10.0 //rezystor(10k) dla fotorezystora
 //#define ObwAnem 0.25434 // metry
 
 //#define ONEWIRE false
 #define I2C true
-#define DEBUG false
+#define DEBUG true
 #define LED_ON false
 
 /*************************************************************/
@@ -43,7 +45,7 @@ int seq = 0;
 
 void setup()
 {
-    rf12_initialize(1, RF12_433MHZ, 212);
+    rf12_initialize(NODEID, RF12_433MHZ, 212);
     rf12_sleep(0);
 #if I2C
       Wire.begin();
@@ -75,6 +77,7 @@ void loop()
 
   if (DEBUG) {
     transmissionRS();
+    transmissionRF();
   }
   else
   {
