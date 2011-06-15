@@ -2,10 +2,12 @@
 #include <Ports.h>
 #include <weather_data.h>
 
-#define JSON 0
+#define JSON 0 //JSON or SERIAL
 #define NODEID 5
+#define LED_ON 1
 
 char str[200];
+static byte ACT_LED = 3;
 
 void setup () {
     Serial.begin(115200);
@@ -17,9 +19,12 @@ void loop () {
     if (rf12_recvDone() && rf12_crc == 0 && (rf12_hdr & RF12_HDR_CTL) == 0 && rf12_len == sizeof pomiar) {
         memcpy(&pomiar, (void*) rf12_data, sizeof pomiar);
         if (RF12_WANTS_ACK) {
-          if (!JSON) {
-            Serial.println("ack");
-          }
+          #if (!JSON)
+            activityLed(1);
+            Serial.println("-----");
+            Serial.println("-> ack");
+            activityLed(0);
+          #endif
           rf12_sendStart(RF12_ACK_REPLY, 0, 0);
         }
         rf12_recvDone();
@@ -49,7 +54,7 @@ void loop () {
           Serial.print(pomiar.solar, DEC);
           Serial.println();
        }
-       memset(str, 0, sizeof(str)); // czyscimy tablice
+       memset(str, 0, sizeof(str)); // clear
    }
    
 }
