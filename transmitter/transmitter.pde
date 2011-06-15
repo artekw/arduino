@@ -1,5 +1,5 @@
 /*
-Nadajnik stacji metrologicznej v0.1
+Weather Station Transmitter v1.0-dev
 Written by Artur Wronowski <artur.wronowski@digi-led.pl>
 */
 
@@ -12,28 +12,33 @@ Written by Artur Wronowski <artur.wronowski@digi-led.pl>
 #include <avr/sleep.h>
 
 /*************************************************************/
-// Definicja wejść/wyjść
-// Analaogowe
-#define LDRPin A0
-#define BatteryPin A1
-//#define WindPin 16
-// Cyfrowe
-#define ACT_LED 3
-//#define ONEWIRE_DATA 3
-#define MOSFET_GATE 7
+// Input/Output definition
+// Analog
+#define LDRPin            A0
+#define BatteryPin        A1
+#define WindPin           A2
 
-// Ustawienia
-#define SLEEP_TIME 15000
-#define RADIO_SYNC_MODE 2
-#define RETRY 5
-#define NODEID 1
-//#define ResLDR 10.0 //rezystor(10k) dla fotorezystora
+// Digital
+#define ACT_LED           3
+#define ONEWIRE_DATA      4
+#define MOSFET_GATE       7
+
+// Settings
+#define MEASURE_PERIOD    60
+#define RETRY_ACK         5  //?
+#define REPORT_EVERY      10 
+#define ACK_TIME          10 //?
+#define RETRY_PERIOD      10 //?
+
 //#define ObwAnem 0.25434 // metry
 
-//#define ONEWIRE false
-#define I2C true
-#define DEBUG true
-#define LED_ON false
+#define ONEWIRE           0
+#define I2C               1
+#define DEBUG             1
+#define LED_ON            0
+
+#define NODEID            1
+#define RADIO_SYNC_MODE   2
 
 /*************************************************************/
 
@@ -41,7 +46,12 @@ Written by Artur Wronowski <artur.wronowski@digi-led.pl>
 
 ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 
+enum { MEASURE, REPORT, TASKS };
+
+Scheduler scheduler (TASKS);
+
 int seq = 0;
+static byte reportCount;
 
 void setup()
 {
@@ -55,37 +65,40 @@ void setup()
       Serial.begin(9600);
       Serial.println("DEBUG MODE");
 #endif
+
+reportCount = REPORT_EVERY;
+scheduler.timer(MEASURE, 0);
 }
 
 void loop()
 {
-#if I2C
-    SHT21.readSensor();
-    delay(50);
-    BMP085.readSensor();
-#endif
-#if I2C
-    getSHT21('h');   
-    getSHT21('t');
-    getBMP085();
-#endif
-  pomiar.lobat = rf12_lowbat();  
-  getLDR();
-  battVol();
-  solar(getLDR());
-  ++pomiar.seq;
+  switch (scheduler.pollWaiting()) {
 
-  if (DEBUG) {
-    transmissionRS();
-    transmissionRF();
+    case MEASURE:
+        scheduler.timer(MEASURE, MEASURE_PERIOD);
+        doMeasure();
+
+        if (reportCount++ >= REPORT_EVERY) {
+          reportCount = 0;
+          scheduler.timer(REPORT, 0);
+        }
+        break;
+    case REPORT:
+        if (DEBUG) {
+          transmissionRS();
+          doReport2();
+        }
+        else
+        {
+          doReport2();
+        }
+        break;
   }
-  else
-  {
-    transmissionRF();
-  }
+}
+ /*
   // zzz...
   for (byte i = 0; i < 1; i++ ) {
     Sleepy::loseSomeTime(SLEEP_TIME);
   }
+*/
 
-}

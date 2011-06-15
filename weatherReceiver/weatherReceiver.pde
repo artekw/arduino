@@ -17,7 +17,7 @@ void setup () {
 
 void loop () {
     if (rf12_recvDone() && rf12_crc == 0 && (rf12_hdr & RF12_HDR_CTL) == 0 && rf12_len == sizeof pomiar) {
-        memcpy(&pomiar, (void*) rf12_data, sizeof pomiar);
+        memcpy(&pomiar, (void*) rf12_data, rf12_len);
         if (RF12_WANTS_ACK) {
           #if (!JSON)
             activityLed(1);

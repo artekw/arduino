@@ -1,5 +1,22 @@
-// pomiar napiecia przed stabilizatorem
-int battVol()
+static void doMeasure() {
+#if I2C
+    SHT21.readSensor();
+    delay(50);
+    BMP085.readSensor();
+#endif
+#if I2C
+    getSHT21('h');
+    getSHT21('t');
+    getBMP085();
+#endif
+  pomiar.lobat = rf12_lowbat();
+  getLDR();
+  getVol();
+  solar(getLDR());
+  ++pomiar.seq;
+}
+
+int getVol()
 {
   if (!pinState(MOSFET_GATE)) 
   {
@@ -10,7 +27,6 @@ int battVol()
   return pomiar.battvol;
 }
 
-// pomiar wilgotnosci lub temperatury
 float getSHT21(char opt)
 {
   if (opt == 'h' )
@@ -24,14 +40,12 @@ float getSHT21(char opt)
   return pomiar.humi || pomiar.temp;
 }
 
-// pomiar cisnienia
 float getBMP085()
 {
   pomiar.pressure = (BMP085.press*10) + 16;
   return pomiar.pressure;
 }
 
-// pomiar nasłonecznienia
 int getLDR()
 {
   int LDRVal = analogRead(LDRPin);
@@ -40,22 +54,19 @@ int getLDR()
   return pomiar.light;
 }  
 
-// pomiar prędkości wiatru
 float getWind()
 {
   //
 }
 
-// pomiar temperatury z DS18B20
 float getTemp()
 {
   //
 }
 
-// transmisja RF
-static void transmissionRF()
+static void doReport()
 {
-  for (byte i = 0; i < RETRY; i++) {
+  for (byte i = 0; i < RETRY_ACK; ++i) {
     rf12_sleep(-1);
     while (!rf12_canSend())
       rf12_recvDone();
@@ -71,16 +82,34 @@ static void transmissionRF()
         Serial.println("-------");
         delay(2);
       #endif
+      scheduler.timer(MEASURE, MEASURE_PERIOD);
       return;
     }
+    Sleepy::loseSomeTime(RETRY_PERIOD * 100);
   }
+  scheduler.timer(MEASURE, MEASURE_PERIOD);
+  #if DEBUG
+    Serial.print("no ACK! ");
+    Serial.println("-------");
+    delay(2);
+  #endif
+}
+
+static void doReport2()
+{
+  rf12_sleep(-1);
+  while (!rf12_canSend())
+    rf12_recvDone();
+  rf12_sendStart(0, &pomiar, sizeof pomiar);
+  rf12_sendWait(RADIO_SYNC_MODE);
+  rf12_sleep(0);
 }
 
 static byte waitForACK() {
   MilliTimer t;
-  while (!t.poll(10)) {
-    if (rf12_recvDone() && rf12_crc == 0 )
-//        && rf12_hdr == (RF12_HDR_DST | RF12_HDR_CTL | NODEID))
+  while (!t.poll(ACK_TIME)) {
+    if (rf12_recvDone() && rf12_crc == 0
+        && rf12_hdr == (RF12_HDR_DST | RF12_HDR_CTL | NODEID))
       return 1;
      set_sleep_mode(SLEEP_MODE_IDLE);
      sleep_mode();
