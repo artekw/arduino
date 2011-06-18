@@ -1,4 +1,5 @@
 static void doMeasure() {
+  solar(getLDR());
 #if I2C
     SHT21.readSensor();
     delay(50);
@@ -11,20 +12,36 @@ static void doMeasure() {
 #endif
   pomiar.lobat = rf12_lowbat();
   getLDR();
-  getVol();
-  solar(getLDR());
+  getBatVol();
+  getSolVol();
   ++pomiar.seq;
 }
 
-int getVol()
+int getBatVol()
 {
-  if (!pinState(MOSFET_GATE)) 
+  byte state = pinState(MOSFET_SOL);
+  if (!pinState(MOSFET_SOL)) 
   {
-     mosfet(0);
+     mosfet(MOSFET_SOL, 0);
   }
   int BatteryVal = analogRead(BatteryPin);
   pomiar.battvol = map((BatteryVal), 0, 1023, 0, 660);
+  mosfet(MOSFET_SOL, state);
   return pomiar.battvol;
+}
+
+int getSolVol()
+{
+  byte state = pinState(MOSFET_BAT);
+  if (!pinState(MOSFET_BAT)) 
+  {
+     mosfet(MOSFET_BAT, 0);
+  }
+
+  int SolarVal = analogRead(SolarPin);
+  pomiar.solvol = map((SolarVal), 0, 1023, 0, 660);
+  mosfet(MOSFET_BAT, state);
+  return pomiar.solvol;
 }
 
 float getSHT21(char opt)
@@ -134,8 +151,12 @@ static void transmissionRS()
   Serial.println(pomiar.lobat, DEC);
   Serial.print("BATVOL ");
   Serial.println(pomiar.battvol);
-  Serial.print("MOSFET ");
-  Serial.println(!pinState(MOSFET_GATE), DEC);
+  Serial.print("SOLVOL ");
+  Serial.println(pomiar.solvol);
+  Serial.print("MSOL ");
+  Serial.println(pinState(MOSFET_SOL), DEC);
+  Serial.print("MBAT ");
+  Serial.println(pinState(MOSFET_BAT), DEC);
   activityLed(0);
 }
 
@@ -145,25 +166,27 @@ static void activityLed (byte on) {
   delay(150);
 }
 
-static void mosfet(byte on) {
-  pinMode(MOSFET_GATE, OUTPUT);
-  digitalWrite(MOSFET_GATE, !on);
+static void mosfet(byte fet, byte on) {
+  pinMode(fet, OUTPUT);
+  digitalWrite(fet, !on);
   delay(100);
 }
 
 static byte solar(int ldr)
 {
   byte tmp;
-  if (ldr < SOLAR) {
-    mosfet(0);
-    tmp = 0;
+  if (ldr > SOLAR) {
+    mosfet(MOSFET_SOL, 1);
+    mosfet(MOSFET_BAT, 1);
+    tmp = 1;
   }
   else
   {
-    mosfet(1);
-    tmp = 1;
+    mosfet(MOSFET_SOL, 0);
+    mosfet(MOSFET_BAT, 0);
+    tmp = 0;
   }
-  return pomiar.solar = tmp;
+  return (pomiar.solar = tmp, pomiar.bat = tmp);
 }
 
 static byte pinState(int pin)

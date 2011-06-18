@@ -16,17 +16,19 @@ Written by Artur Wronowski <artur.wronowski@digi-led.pl>
 // Analog
 #define LDRPin            A0
 #define BatteryPin        A1
-#define WindPin           A2
+#define SolarPin          A2
+#define WindPin           A3 //?
 
 // Digital
 #define ACT_LED           3
 #define ONEWIRE_DATA      4
-#define MOSFET_GATE       7
+#define MOSFET_SOL        7
+#define MOSFET_BAT        8
 
 // Settings
-#define MEASURE_PERIOD    60
+#define MEASURE_PERIOD    300 //60
 #define RETRY_ACK         5  //?
-#define REPORT_EVERY      10 
+#define REPORT_EVERY      15 //10 
 #define ACK_TIME          10 //?
 #define RETRY_PERIOD      10 //?
 #define SOLAR             100
@@ -35,7 +37,7 @@ Written by Artur Wronowski <artur.wronowski@digi-led.pl>
 
 #define ONEWIRE           0
 #define I2C               1
-#define DEBUG             1
+#define DEBUG             0
 #define LED_ON            0
 
 #define NODEID            1
@@ -97,10 +99,4 @@ void loop()
         break;
   }
 }
- /*
-  // zzz...
-  for (byte i = 0; i < 1; i++ ) {
-    Sleepy::loseSomeTime(SLEEP_TIME);
-  }
-*/
 

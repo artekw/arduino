@@ -6,7 +6,7 @@
 #define NODEID 5
 #define LED_ON 1
 
-char str[200];
+char str[250];
 static byte ACT_LED = 3;
 
 void setup () {
@@ -48,10 +48,14 @@ void loop () {
           Serial.print(pomiar.wind);
           Serial.print(" W" );
           Serial.print(pomiar.lobat, DEC);
-          Serial.print(" B");
+          Serial.print(" BV");
           Serial.print(pomiar.battvol);
+          Serial.print(" SV");
+          Serial.print(pomiar.solvol);
           Serial.print(" SOL");
           Serial.print(pomiar.solar, DEC);
+          Serial.print(" BAT");
+          Serial.print(pomiar.bat, DEC);
           Serial.println();
        }
        memset(str, 0, sizeof(str)); // clear
