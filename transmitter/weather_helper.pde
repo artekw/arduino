@@ -154,7 +154,7 @@ static void mosfet(byte on) {
 static byte solar(int ldr)
 {
   byte tmp;
-  if (ldr < 220) {
+  if (ldr < SOLAR) {
     mosfet(0);
     tmp = 0;
   }

@@ -29,6 +29,7 @@ Written by Artur Wronowski <artur.wronowski@digi-led.pl>
 #define REPORT_EVERY      10 
 #define ACK_TIME          10 //?
 #define RETRY_PERIOD      10 //?
+#define SOLAR             100
 
 //#define ObwAnem 0.25434 // metry
 
@@ -48,7 +49,8 @@ ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 
 enum { MEASURE, REPORT, TASKS };
 
-Scheduler scheduler (TASKS);
+static word schedbuf[TASKS];
+Scheduler scheduler (schedbuf, TASKS);
 
 int seq = 0;
 static byte reportCount;
