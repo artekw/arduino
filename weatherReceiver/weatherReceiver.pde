@@ -2,8 +2,7 @@
 #include <Ports.h>
 #include <weather_data.h>
 
-#define JSON 0 //JSON or SERIAL
-#define NODEID 5
+#define JSON 1 //JSON or SERIAL
 #define LED_ON 1
 
 char str[250];
@@ -12,12 +11,13 @@ static byte ACT_LED = 3;
 void setup () {
     Serial.begin(115200);
     Serial.println("\n[WeatherStation]");
-    rf12_initialize(NODEID, RF12_433MHZ, 212);
+    rf12_initialize(10, RF12_433MHZ, 212);
+//    rf12_control(0xC647);
 }
 
 void loop () {
     if (rf12_recvDone() && rf12_crc == 0 && (rf12_hdr & RF12_HDR_CTL) == 0 && rf12_len == sizeof pomiar) {
-        memcpy(&pomiar, (void*) rf12_data, rf12_len);
+        memcpy(&pomiar, (void*) rf12_data, sizeof pomiar);
         if (RF12_WANTS_ACK) {
           #if (!JSON)
             activityLed(1);
@@ -27,15 +27,14 @@ void loop () {
           #endif
           rf12_sendStart(RF12_ACK_REPLY, 0, 0);
         }
-        rf12_recvDone();
         if (JSON) {
           createJSON();
           transmissionRF();
         }
         else {
           Serial.print("WS ");
-          Serial.print("LP");
-          Serial.print(pomiar.seq);
+//          Serial.print("LP");
+//          Serial.print(pomiar.seq);
           Serial.print(" L");
           Serial.print(pomiar.light, DEC);
           Serial.print(" H");
@@ -44,8 +43,8 @@ void loop () {
           Serial.print(pomiar.temp);
           Serial.print(" P");
           Serial.print(pomiar.pressure);
-          Serial.print(" S");
-          Serial.print(pomiar.wind);
+//          Serial.print(" S");
+//          Serial.print(pomiar.wind);
           Serial.print(" W" );
           Serial.print(pomiar.lobat, DEC);
           Serial.print(" BV");
@@ -75,10 +74,12 @@ void createJSON()
   addJSON(str,"RH",  pomiar.humi);
   addJSON(str,"T",  pomiar.temp);
   addJSON(str,"PR",  pomiar.pressure);
-  addJSON(str,"SP", pomiar.wind);
-  addJSON(str,"VOL",  pomiar.battvol);
+//  addJSON(str,"SP", pomiar.wind);
+  addJSON(str,"BV",  pomiar.battvol);
+  addJSON(str,"SV",  pomiar.solvol);
   addJSON(str,"LB", pomiar.lobat);
   addJSON(str,"SOL", pomiar.solar);
+  addJSON(str,"BAT", pomiar.solar);
   endJSON(str);
 }
 

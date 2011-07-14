@@ -1,46 +1,59 @@
 static void doMeasure() {
-  solar(getLDR());
 #if I2C
     SHT21.readSensor();
-    delay(50);
+    delay(32);
     BMP085.readSensor();
-#endif
-#if I2C
+    // measure
     getSHT21('h');
     getSHT21('t');
     getBMP085();
 #endif
+#if ONEWIRE
+    getTemp_1Wire();
+#endif
   pomiar.lobat = rf12_lowbat();
-  getLDR();
   getBatVol();
+  getLDR();
+#if SOLAR
   getSolVol();
-  ++pomiar.seq;
+  solar(getLDR());
+#endif
+//  ++pomiar.seq;
 }
 
 int getBatVol()
 {
+#if SOLAR
   byte state = pinState(MOSFET_SOL);
   if (!pinState(MOSFET_SOL)) 
   {
      mosfet(MOSFET_SOL, 0);
   }
-  int BatteryVal = analogRead(BatteryPin);
+#endif
+//  digitalWrite(BatteryPin, 1);
+  int BatteryVal = analogRead(BatteryVolPin);
   pomiar.battvol = map((BatteryVal), 0, 1023, 0, 660);
+//  digitalWrite(BatteryPin, 0);
+#if SOLAR
   mosfet(MOSFET_SOL, state);
+#endif
   return pomiar.battvol;
 }
 
 int getSolVol()
 {
+#if SOLAR
   byte state = pinState(MOSFET_BAT);
   if (!pinState(MOSFET_BAT)) 
   {
      mosfet(MOSFET_BAT, 0);
   }
-
-  int SolarVal = analogRead(SolarPin);
+#endif
+  int SolarVal = analogRead(SolarVolPin);
   pomiar.solvol = map((SolarVal), 0, 1023, 0, 660);
+#if SOLAR
   mosfet(MOSFET_BAT, state);
+#endif
   return pomiar.solvol;
 }
 
@@ -65,7 +78,9 @@ float getBMP085()
 
 int getLDR()
 {
+//  digitalWrite(LDRPin, 1);
   int LDRVal = analogRead(LDRPin);
+//  digitalWrite(LDRPin, 0);
   LDRVal = 1023 - LDRVal;
   pomiar.light = map((LDRVal), 0, 1023, 0, 255);
   return pomiar.light;
@@ -76,9 +91,13 @@ float getWind()
   //
 }
 
-float getTemp()
+float getTemp_1Wire()
 {
-  //
+#if ONEWIRE
+  sensors.requestTemperatures();
+  float tempC = sensors.getTempCByIndex(0);
+  return pomiar.temp = tempC;
+#endif
 }
 
 static void doReport()
@@ -125,8 +144,7 @@ static void doReport2()
 static byte waitForACK() {
   MilliTimer t;
   while (!t.poll(ACK_TIME)) {
-    if (rf12_recvDone() && rf12_crc == 0
-        && rf12_hdr == (RF12_HDR_DST | RF12_HDR_CTL | NODEID))
+    if (rf12_recvDone() && rf12_crc == 0 && rf12_hdr == (RF12_HDR_DST | RF12_HDR_CTL | NODEID))
       return 1;
      set_sleep_mode(SLEEP_MODE_IDLE);
      sleep_mode();
@@ -137,6 +155,7 @@ static byte waitForACK() {
 static void transmissionRS()
 {
   activityLed(1);
+  Serial.println(' ');
   Serial.print("LIGHT ");
   Serial.println(pomiar.light);
   Serial.print("HUMI ");
@@ -145,8 +164,8 @@ static void transmissionRS()
   Serial.println(pomiar.temp);
   Serial.print("PRES ");
   Serial.println(pomiar.pressure);
-  Serial.print("SPD ");
-  Serial.println(pomiar.wind);
+//  Serial.print("SPD ");
+//  Serial.println(pomiar.wind);
   Serial.print("LOBAT " );
   Serial.println(pomiar.lobat, DEC);
   Serial.print("BATVOL ");
@@ -154,9 +173,9 @@ static void transmissionRS()
   Serial.print("SOLVOL ");
   Serial.println(pomiar.solvol);
   Serial.print("MSOL ");
-  Serial.println(pinState(MOSFET_SOL), DEC);
+  Serial.println(!pinState(MOSFET_SOL), DEC);
   Serial.print("MBAT ");
-  Serial.println(pinState(MOSFET_BAT), DEC);
+  Serial.println(!pinState(MOSFET_BAT), DEC);
   activityLed(0);
 }
 
@@ -175,7 +194,7 @@ static void mosfet(byte fet, byte on) {
 static byte solar(int ldr)
 {
   byte tmp;
-  if (ldr > SOLAR) {
+  if (ldr > LDR_TR) {
     mosfet(MOSFET_SOL, 1);
     mosfet(MOSFET_BAT, 1);
     tmp = 1;
