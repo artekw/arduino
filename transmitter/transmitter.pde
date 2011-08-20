@@ -1,6 +1,7 @@
 /*
 Weather Station Transmitter v1.0-dev
 Written by Artur Wronowski <artur.wronowski@digi-led.pl>
+Works with optiboot too.
 */
 
 #include <Wire.h>
@@ -24,14 +25,14 @@ Written by Artur Wronowski <artur.wronowski@digi-led.pl>
 // Digital
 #define ACT_LED           3
 #define ONEWIRE_DATA      4
-#define MOSFET_SOL        7 // not used in v1
-#define MOSFET_BAT        8 // not used in v1
+#define MOSFET_SOL        5
+#define MOSFET_BAT        6 // not used in v1
 
 // Settings
-#define MEASURE_PERIOD    10 //300
-#define RETRY_ACK         3  //?
-#define REPORT_EVERY      20 //20 
-#define ACK_TIME          10 //?
+#define MEASURE_PERIOD    100 //300
+#define RETRY_ACK         3  //? // how many times try get ack
+#define REPORT_EVERY      20 //20  
+#define ACK_TIME          10 //? // time for recive ack packet (in milisec)
 #define RETRY_PERIOD      10 //?
 #define LDR_TR            150 // LDR treshold, over activate solar
 static byte NODEID = 2;       // ID this node
@@ -41,10 +42,11 @@ static byte NODEID = 2;       // ID this node
 // Used devices and buses
 #define ONEWIRE           0 // use 1wire bus
 #define I2C               1 // use i2c bus
-#define SHT21_TEMP        1 // read temperature from SHT21 (only if I2C bus is used)
-#define DEBUG             1 // debug mode - serial
+#define SHT21_TEMP        1 // read temperature from SHT21 (only if I2C bus is used) not implemented yet
+#define DEBUG             0 // debug mode - serial
 #define LED_ON            0 // use act led - transmission
-#define SOLAR             0 // use solar to power device
+#define SOLAR             0 // use solar to power device and charge batteries
+#define SOLAR_V1          0
 
 #define RADIO_SYNC_MODE   2
 

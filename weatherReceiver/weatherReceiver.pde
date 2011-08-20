@@ -3,13 +3,14 @@
 #include <weather_data.h>
 
 #define JSON 1 //JSON or SERIAL
-#define LED_ON 1
 
 char str[250];
-static byte ACT_LED = 3;
+static byte ACT_LED = 9;
 
 void setup () {
     Serial.begin(115200);
+//    pinMode(ACT_LED, OUTPUT);
+//    digitalWrite(ACT_LED, HIGH);
     Serial.println("\n[WeatherStation]");
     rf12_initialize(10, RF12_433MHZ, 212);
 //    rf12_control(0xC647);
@@ -30,6 +31,8 @@ void loop () {
         if (JSON) {
           createJSON();
           transmissionRF();
+//          activityLed(1);
+//          activityLed(0);
         }
         else {
           Serial.print("WS ");
@@ -79,12 +82,11 @@ void createJSON()
   addJSON(str,"SV",  pomiar.solvol);
   addJSON(str,"LB", pomiar.lobat);
   addJSON(str,"SOL", pomiar.solar);
-  addJSON(str,"BAT", pomiar.solar);
+  addJSON(str,"BAT", pomiar.bat);
   endJSON(str);
 }
 
 static void activityLed (byte on) {
-  pinMode(ACT_LED, OUTPUT);
-  digitalWrite(ACT_LED, on);
+  digitalWrite(ACT_LED, !on);
   delay(150);
 }

@@ -21,8 +21,8 @@ void loop () {
         Serial.print(" P");
         Serial.print(pomiar.pressure);
         Serial.print(" S");
-        Serial.print(pomiar.wind);
-        Serial.print(" W" );
+//        Serial.print(pomiar.wind);
+//        Serial.print(" W" );
         Serial.print(pomiar.lobat, DEC);
         Serial.print(" B");
         Serial.print(pomiar.battvol);

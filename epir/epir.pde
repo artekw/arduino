@@ -1,7 +1,7 @@
 
 #include <NewSoftSerial.h>
 
-NewSoftSerial ss(2, 3);
+NewSoftSerial ss(3, 2);
 
 void setup()  
 {
@@ -19,8 +19,8 @@ static char getch() {
 void loop()                     
 {
   ss.print('a');
-//  Serial.print(getch());
-//  Serial.print(' ');
+  Serial.print(getch());
+  Serial.print(' ');
   if (getch() == 'Y') {
     digitalWrite(13, HIGH);
   }
