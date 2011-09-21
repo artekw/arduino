@@ -1,9 +1,10 @@
 typedef struct {
+//	int nodeid;
 	int light;
 	float humi;
 	float temp;
 	float pressure;
-	byte lobat		:1;
+//	byte lobat		:1;
 	int battvol;
 	int solvol;
 //	int seq;

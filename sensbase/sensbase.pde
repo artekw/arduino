@@ -48,8 +48,8 @@ void loop () {
           Serial.print(pomiar.pressure);
 //          Serial.print(" S");
 //          Serial.print(pomiar.wind);
-          Serial.print(" W" );
-          Serial.print(pomiar.lobat, DEC);
+//          Serial.print(" W" );
+//          Serial.print(pomiar.lobat, DEC);
           Serial.print(" BV");
           Serial.print(pomiar.battvol);
           Serial.print(" SV");
@@ -80,7 +80,7 @@ void createJSON()
 //  addJSON(str,"SP", pomiar.wind);
   addJSON(str,"BV",  pomiar.battvol);
   addJSON(str,"SV",  pomiar.solvol);
-  addJSON(str,"LB", pomiar.lobat);
+//  addJSON(str,"LB", pomiar.lobat);
   addJSON(str,"SOL", pomiar.solar);
   addJSON(str,"BAT", pomiar.bat);
   endJSON(str);
