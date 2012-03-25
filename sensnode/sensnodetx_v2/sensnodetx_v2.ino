@@ -1,14 +1,14 @@
 /*
-SensnodeTX v1.0-dev
+SensnodeTX v2.0-dev
 Written by Artur Wronowski <artur.wronowski@digi-led.pl>
 Works with optiboot too.
-Need Arduino 1.0-RC1 do compile
+Need Arduino 1.0 do compile
 */
 
 // libs for I2C and 1Wire
 #include <Wire.h>
-//#include <OneWire.h>
-//#include <DallasTemperature.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 // lisb for SHT21 and BMP085
 #include <SHT21.h>
 #include <BMP085.h>
@@ -19,10 +19,7 @@ Need Arduino 1.0-RC1 do compile
 
 /*************************************************************/
 
-static byte NODEID        = 2;  // ID this node
-static byte NODEGROUP     = 212;
-
-// Structure of Data
+// structure of data
 typedef struct {
 	int nodeid;
 	int light;
@@ -33,26 +30,35 @@ typedef struct {
 	int battvol;
 	int solvol;
 	byte solar		:1;
+	byte bat		:1;
 } Payload;
 Payload measure;
+
+static byte NODEID = 2;       // ID this node
+static byte NODEGROUP = 212;
 
 // Input/Output definition
 // Analog
 #define LDRPin            0
-#define WindPin           2
-#define BatteryVolPin     3
+#define BatteryVolPin     1
+#define SolarVolPin       2
+#define CustomA3          3
 
 // Digital
-#define ACT_LED           3
-#define ONEWIRE_DATA      4
+#define CustomD3          3
+#define CustomD4          4
 #define MOSFET_SOL        5
+#define MOSFET_BAT        6
+#define CustomD7          7
+#define ONEWIRE_DATA      8
+#define ACT_LED           9 // or custom use
 
 // Settings
-#define MEASURE_PERIOD    5 //300
-#define RETRY_ACK         3  //? // how many times try get ack
-#define REPORT_EVERY      10 //20  
-#define ACK_TIME          100 //? // time for recive ack packet (in milisec)
-#define RETRY_PERIOD      10 //?
+#define MEASURE_PERIOD    300 //300
+#define RETRY_PERIOD      5
+#define RETRY_ACK         5 // how many times try get ack
+#define ACK_TIME          10 // time for recive ack packet (in milisec)
+#define REPORT_EVERY      5 //20  
 #define LDR_TR            50 // LDR treshold, over activate solar
 
 //#define ObwAnem 0.25434 // meters
@@ -61,11 +67,9 @@ Payload measure;
 #define LDR               0
 #define ONEWIRE           0 // use 1wire bus
 #define I2C               1 // use i2c bus
-#define SHT21_TEMP        0 // read temperature from SHT21 (only if I2C bus is used) not implemented yet
 #define DEBUG             1 // debug mode - serial
-#define LED_ON            0 // use act led - transmission
-#define SOLAR             0 // use solar to power device and charge batteries
-#define NTC               0 // wind measure
+#define LED_ON            1 // use act led - transmission
+#define SOLAR             0 // use solar to charge batteries
 
 #define RADIO_SYNC_MODE   2
 
@@ -104,11 +108,12 @@ void setup()
     sensors.begin();
 #endif
 
-  rf12_sleep(0);
+  rf12_sleep(RF12_SLEEP);
 
   reportCount = REPORT_EVERY;
   scheduler.timer(MEASURE, 0);
 }
+
 
 void loop()
 {
@@ -130,26 +135,33 @@ void loop()
     case REPORT:
         if (DEBUG) {
           transmissionRS();
-          doReport2();
+          doReport();
         }
         else
         {
-          doReport2();
+		if (LED_ON) {
+			activityLed(1);
+			}
+          doReport();
+		if (LED_ON) {
+			activityLed(0);
+			}
         }
         break;
   }
 }
 
-static void doReport()
+
+static void doReportACK()
 {
   for (byte i = 0; i < RETRY_ACK; ++i) {
-    rf12_sleep(-1);
+    rf12_sleep(RF12_WAKEUP);
     while (!rf12_canSend())
       rf12_recvDone();
     rf12_sendStart(RF12_HDR_ACK, &measure, sizeof measure);
     rf12_sendWait(RADIO_SYNC_MODE);
     byte acked = waitForACK();
-    rf12_sleep(0);
+    rf12_sleep(RF12_SLEEP);
     
     if (acked) {
       #if DEBUG
@@ -171,14 +183,14 @@ static void doReport()
   #endif
 }
 
-static void doReport2()
+
+static void doReport()
 {
-  rf12_sleep(-1);
+  rf12_sleep(RF12_WAKEUP);
   while (!rf12_canSend())
     rf12_recvDone();
-  rf12_sendStart(0, &measure, sizeof measure);
-  rf12_sendWait(RADIO_SYNC_MODE);
-  rf12_sleep(0);
+  rf12_sendStart(0, &measure, sizeof measure, RADIO_SYNC_MODE);
+  rf12_sleep(RF12_SLEEP);
 }
 
 static byte waitForACK() {
@@ -191,31 +203,33 @@ static byte waitForACK() {
   }
   return 0;
 }
-      
+
+
 static void transmissionRS()
 {
   activityLed(1);
   Serial.println(' ');
-//  Serial.print("LIGHT ");
-//  Serial.println(measure.light);
-//  Serial.print("HUMI ");
-//  Serial.println(measure.humi);
-//  Serial.print("TEMP ");
-//  Serial.println(measure.temp);
-//  Serial.print("PRES ");
-//  Serial.println(measure.pressure);
-//  Serial.print("NTC ");
-//  Serial.println(measure.ntc);
-//  Serial.print("LOBAT " );
-//  Serial.println(measure.lobat, DEC);
-//  Serial.print("BATVOL ");
-//  Serial.println(measure.battvol);
-//  Serial.print("SOLVOL ");
-//  Serial.println(measure.solvol);
-//  Serial.print("MBSOL ");
-//  Serial.println(!pinState(MOSFET_SOL), DEC);
+  Serial.print("LIGHT ");
+  Serial.println(measure.light);
+  Serial.print("HUMI ");
+  Serial.println(measure.humi);
+  Serial.print("TEMP ");
+  Serial.println(measure.temp);
+  Serial.print("PRES ");
+  Serial.println(measure.pressure);
+  Serial.print("LOBAT " );
+  Serial.println(measure.lobat, DEC);
+  Serial.print("BATVOL ");
+  Serial.println(measure.battvol);
+  Serial.print("SOLVOL ");
+  Serial.println(measure.solvol);
+  Serial.print("MSOL ");
+  Serial.println(!pinState(MOSFET_SOL), DEC);
+  Serial.print("MBAT ");
+  Serial.println(!pinState(MOSFET_BAT), DEC);
   activityLed(0);
 }
+
 
 static void activityLed (byte on) {
   pinMode(ACT_LED, OUTPUT);
@@ -223,30 +237,75 @@ static void activityLed (byte on) {
   delay(150);
 }
 
-static void mosfet(byte fet, byte on) {
+
+static void mosfetControl(byte fet, byte on) {
   pinMode(fet, OUTPUT);
-  digitalWrite(fet, !on);
+  digitalWrite(fet, on);
   delay(100);
 }
 
-/*
-static byte solar_v1(int ldr)
+
+static byte solar(int ldr)
 {
+  byte tmp;
   if (ldr > LDR_TR) {
-    // enable
-    mosfet(MOSFET_SOL, 1);
-    measure.solar = 1;
+    mosfetControl(MOSFET_SOL, 1);
+    mosfetControl(MOSFET_BAT, 1);
+    tmp = 1;
   }
   else
   {
-    // disable
-    mosfet(MOSFET_SOL, 0);
-    measure.solar = 0;
+    mosfetControl(MOSFET_SOL, 0);
+    mosfetControl(MOSFET_BAT, 0);
+    tmp = 0;
   }
-  return measure.solar;
+  return (measure.solar = tmp, measure.bat = tmp);
 }
-*/
+
+
 static byte pinState(int pin)
 {
   return digitalRead(pin) ? 1 : 0;
 }
+
+int getBatVol()
+{
+#if SOLAR
+  byte state = pinState(MOSFET_SOL);
+  if (pinState(MOSFET_SOL)) 
+  {
+     mosfetControl(MOSFET_SOL, 0);
+  }
+#endif
+  int BatteryVal = analogRead(BatteryVolPin);
+  measure.battvol = map((BatteryVal), 0, 1023, 0, 660);
+#if SOLAR
+  mosfetControl(MOSFET_SOL, state);
+#endif
+  return measure.battvol;
+}
+
+int getSolVol()
+{
+  byte state = pinState(MOSFET_BAT);
+  if (pinState(MOSFET_BAT)) 
+  {
+     mosfetControl(MOSFET_BAT, 0);
+  }
+
+  int SolarVal = analogRead(SolarVolPin);
+  measure.solvol = map((SolarVal), 0, 1023, 0, 660);
+
+  mosfetControl(MOSFET_BAT, state);
+
+  return measure.solvol;
+}
+
+
+int getLDR()
+{
+  int LDRVal = analogRead(LDRPin);
+  LDRVal = 1023 - LDRVal;
+  measure.light = map((LDRVal), 0, 1023, 0, 100);
+  return measure.light;
+} 
