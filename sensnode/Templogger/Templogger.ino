@@ -8,6 +8,7 @@
 
 #define chipSelect 10 // pin 10 in SensnodeTX
 #define ONE_WIRE_BUS 8
+#define ACT_LED 9
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
@@ -32,7 +33,6 @@ void setup()
 
 void loop()
 {
-  
   if(Serial.available() > 0){
        p.year= (byte) ((Serial.read() - 48) *10 +  (Serial.read() - 48)) + 2000;
        p.month = (byte) ((Serial.read() - 48) *10 +  (Serial.read() - 48));
@@ -47,7 +47,7 @@ void loop()
        }
   }
   
-  // make a string for assembling the data to log:
+  
   String dataString = "";
   
   p.get_time();
@@ -62,22 +62,27 @@ void loop()
   dtostrf(sensors.getTempCByIndex(0), 2, 2, buf);  
   dataString += buf;
   
-  // open the file. note that only one file can be open at a time,
-  // so you have to close this one before opening another.
+  activityLed(1);
   File dataFile = SD.open("datalog.txt", FILE_WRITE);
 
   // if the file is available, write to it:
   if (dataFile) {
     dataFile.println(dataString);
     dataFile.close();
-    // print to the serial port too:
+    activityLed(0);
 //    Serial.println(dataString);
   }  
-  // if the file isn't open, pop up an error:
   else {
 //    Serial.println("error opening datalog.txt");
   }
   delay(5000);
+  
+}
+
+static void activityLed (byte on) {
+  pinMode(ACT_LED, OUTPUT);
+  digitalWrite(ACT_LED, on);
+  delay(150);
 }
 
 
