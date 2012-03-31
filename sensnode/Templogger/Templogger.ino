@@ -2,7 +2,7 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-#include <Wire.h> // necessary, or the application won't build properly
+#include <Wire.h>
 #include <stdio.h>
 #include <PCF8583.h>
 
@@ -47,7 +47,6 @@ void loop()
        }
   }
   
-  
   String dataString = "";
   
   p.get_time();
@@ -84,12 +83,3 @@ static void activityLed (byte on) {
   digitalWrite(ACT_LED, on);
   delay(150);
 }
-
-
-
-
-
-
-
-
-

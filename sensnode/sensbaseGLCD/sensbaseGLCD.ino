@@ -1,6 +1,5 @@
 #include <GLCD_ST7565.h>		
 #include <JeeLib.h>
-#include <weather_data.h>
 #include <avr/pgmspace.h>
 
 #include "utility/font_clR6x8.h"
@@ -23,6 +22,21 @@ unsigned long last;
 GLCD_ST7565 glcd;
 
 extern byte gLCDBuf[1024];
+
+// structure of data
+typedef struct {
+	int nodeid;
+	int light;
+	float humi;
+	float temp;
+	float pressure;
+	byte lobat		:1;
+	int battvol;
+	int solvol;
+	byte solar		:1;
+	byte bat		:1;
+} Payload;
+Payload measure;
 
 void setup () {
   #if (JSONRS)
