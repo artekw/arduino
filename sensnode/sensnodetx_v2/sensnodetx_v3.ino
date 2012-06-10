@@ -1,5 +1,5 @@
 /*
-SensnodeTX v2.0-dev
+SensnodeTX v3.0-dev
 Written by Artur Wronowski <artur.wronowski@digi-led.pl>
 Works with optiboot too.
 Need Arduino 1.0 do compile
@@ -28,9 +28,7 @@ typedef struct {
 	float pressure;
 	byte lobat		:1;
 	int battvol;
-	int solvol;
-	byte solar		:1;
-	byte bat		:1;
+	byte fet		:1;
 } Payload;
 Payload measure;
 
@@ -41,33 +39,32 @@ static byte NODEGROUP = 212;
 // Analog
 #define LDRPin            0
 #define BatteryVolPin     1
-#define SolarVolPin       2
 #define CustomA3          3
 
 // Digital
 #define CustomD3          3
 #define CustomD4          4
-#define MOSFET_SOL        5
-#define MOSFET_BAT        6
+#define MOSFET            5
+#define RTC_INT           6
 #define CustomD7          7
 #define ONEWIRE_DATA      8
 #define ACT_LED           9 // or custom use
 
 // Settings
 #define MEASURE_PERIOD    300 //300
-#define RETRY_PERIOD      5
+#define RETRY_PERIOD      10
 #define RETRY_ACK         5 // how many times try get ack
 #define ACK_TIME          10 // time for recive ack packet (in milisec)
-#define REPORT_EVERY      5 //20  
-#define LDR_TR            50 // LDR treshold, over activate solar
+#define REPORT_EVERY      6 //5
+#define SMOOTH            3
 
 //#define ObwAnem 0.25434 // meters
 
 // Used devices and buses
-#define LDR               0
+#define LDR               1
 #define ONEWIRE           0 // use 1wire bus
 #define I2C               1 // use i2c bus
-#define DEBUG             1 // debug mode - serial
+#define DEBUG             0 // debug mode - serial
 #define LED_ON            1 // use act led - transmission
 #define SOLAR             0 // use solar to charge batteries
 
@@ -84,6 +81,10 @@ enum { MEASURE, REPORT, TASKS };
 static word schedbuf[TASKS];
 Scheduler scheduler (schedbuf, TASKS);
 
+Port ldr (1);
+Port batvol (3);
+
+byte count = 0;
 static byte reportCount;
 
 #if ONEWIRE
@@ -112,8 +113,20 @@ void setup()
 
   reportCount = REPORT_EVERY;
   scheduler.timer(MEASURE, 0);
+  
+  pinMode(5, OUTPUT);
+  digitalWrite(5, LOW);
+  batvol.digiWrite2(0);
+  ldr.digiWrite2(0);
+  
 }
 
+
+static int smoothedAverage(int prev, int next, byte firstTime =0) {
+    if (firstTime)
+        return next;
+    return ((SMOOTH - 1) * prev + next + SMOOTH / 2) / SMOOTH;
+}
 
 void loop()
 {
@@ -121,8 +134,9 @@ void loop()
      Serial.print('.');
      delay(2);	
   #endif
+  
   switch (scheduler.pollWaiting()) {
-
+    
     case MEASURE:
         scheduler.timer(MEASURE, MEASURE_PERIOD);
         doMeasure();
@@ -204,7 +218,6 @@ static byte waitForACK() {
   return 0;
 }
 
-
 static void transmissionRS()
 {
   activityLed(1);
@@ -221,12 +234,6 @@ static void transmissionRS()
   Serial.println(measure.lobat, DEC);
   Serial.print("BATVOL ");
   Serial.println(measure.battvol);
-  Serial.print("SOLVOL ");
-  Serial.println(measure.solvol);
-  Serial.print("MSOL ");
-  Serial.println(!pinState(MOSFET_SOL), DEC);
-  Serial.print("MBAT ");
-  Serial.println(!pinState(MOSFET_BAT), DEC);
   activityLed(0);
 }
 
@@ -238,74 +245,40 @@ static void activityLed (byte on) {
 }
 
 
-static void mosfetControl(byte fet, byte on) {
-  pinMode(fet, OUTPUT);
-  digitalWrite(fet, on);
+static void mosfetControl(byte on) {
+  pinMode(MOSFET, OUTPUT);
+  digitalWrite(MOSFET, on);
   delay(100);
 }
-
-
-static byte solar(int ldr)
-{
-  byte tmp;
-  if (ldr > LDR_TR) {
-    mosfetControl(MOSFET_SOL, 1);
-    mosfetControl(MOSFET_BAT, 1);
-    tmp = 1;
-  }
-  else
-  {
-    mosfetControl(MOSFET_SOL, 0);
-    mosfetControl(MOSFET_BAT, 0);
-    tmp = 0;
-  }
-  return (measure.solar = tmp, measure.bat = tmp);
-}
-
 
 static byte pinState(int pin)
 {
   return digitalRead(pin) ? 1 : 0;
 }
 
-int getBatVol()
-{
-#if SOLAR
-  byte state = pinState(MOSFET_SOL);
-  if (pinState(MOSFET_SOL)) 
-  {
-     mosfetControl(MOSFET_SOL, 0);
+static void doMeasure() {
+  count++;
+  byte firstTime = measure.humi == 0;
+#if LDR
+  if ((count % 2) == 0) {
+     measure.light = ldr.anaRead();
   }
 #endif
-  int BatteryVal = analogRead(BatteryVolPin);
-  measure.battvol = map((BatteryVal), 0, 1023, 0, 660);
-#if SOLAR
-  mosfetControl(MOSFET_SOL, state);
+#if I2C
+  SHT21.readSensor();
+  measure.humi = SHT21.humi;
+  measure.temp = SHT21.temp;
+  delay(32);
+  BMP085.readSensor();
+  measure.pressure = (BMP085.press*10) + 16;
 #endif
-  return measure.battvol;
+#if ONEWIRE
+  sensors.requestTemperatures();
+  float tempC = sensors.getTempCByIndex(0);
+  measure.temp = tempC;
+#endif
+  measure.battvol = map(batvol.anaRead(), 0, 1023, 0, 660);
+  measure.nodeid = NODEID;
+  measure.lobat = rf12_lowbat();
 }
 
-int getSolVol()
-{
-  byte state = pinState(MOSFET_BAT);
-  if (pinState(MOSFET_BAT)) 
-  {
-     mosfetControl(MOSFET_BAT, 0);
-  }
-
-  int SolarVal = analogRead(SolarVolPin);
-  measure.solvol = map((SolarVal), 0, 1023, 0, 660);
-
-  mosfetControl(MOSFET_BAT, state);
-
-  return measure.solvol;
-}
-
-
-int getLDR()
-{
-  int LDRVal = analogRead(LDRPin);
-  LDRVal = 1023 - LDRVal;
-  measure.light = map((LDRVal), 0, 1023, 0, 100);
-  return measure.light;
-} 

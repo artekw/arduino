@@ -18,9 +18,8 @@ typedef struct {
 	float pressure;
 	byte lobat		:1;
 	int battvol;
-	int solvol;
-	byte solar		:1;
-	byte bat		:1;
+//	int solvol;
+	byte fet		:1;
 } Payload;
 Payload measure;
 
@@ -77,10 +76,10 @@ void createJSON()
   addJSON(str,"temp",  measure.temp);
   addJSON(str,"press",  measure.pressure);
   addJSON(str,"batvol",  measure.battvol);
-  addJSON(str,"solvol",  measure.solvol);
+//  addJSON(str,"solvol",  measure.solvol);
   addJSON(str,"lobat", measure.lobat);
-  addJSON(str,"solon", measure.solar);
-  addJSON(str,"baton", measure.bat);
+//  addJSON(str,"solon", measure.solar);
+//  addJSON(str,"baton", measure.bat);
   endJSON(str);
 }
 
