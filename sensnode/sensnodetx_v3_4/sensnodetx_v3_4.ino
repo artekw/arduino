@@ -1,78 +1,83 @@
 /*
-SensnodeTX v3.0-dev
+SensnodeTX v3.4-dev
 Written by Artur Wronowski <artur.wronowski@digi-led.pl>
 Works with optiboot too.
 Need Arduino 1.0 do compile
+
+TODO:
+- pomiar napiecia bateri, skalowanie czasu pomiedzy pomiarami w zaleznosci od panujacego napiecia
+- srednia z pomiarow
+- wiartomierz //#define ObwAnem 0.25434 // meters
+- http://hacking.majenko.co.uk/node/57
 */
 
-// libs for I2C and 1Wire
+// libs for I2C and DS18B20
 #include <Wire.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 // lisb for SHT21 and BMP085
 #include <SHT21.h>
 #include <BMP085.h>
-// lib for RFM12B from <jeelabs.org>
+// lib for RFM12B from https://github.com/jcw/jeelib
 #include <JeeLib.h>
 // avr sleep instructions
 #include <avr/sleep.h>
 
 /*************************************************************/
 
-// structure of data
-typedef struct {
-	int nodeid;
-	int light;
-	float humi;
-	float temp;
-	float pressure;
-	byte lobat		:1;
-	int battvol;
-	byte fet		:1;
-} Payload;
-Payload measure;
-
-static byte NODEID = 2;       // ID this node
+static byte NODEID    = 5;
 static byte NODEGROUP = 212;
 
 // Input/Output definition
 // Analog
-#define LDRPin            0
-#define BatteryVolPin     1
-#define CustomA3          3
+#define LDRPin            2
+#define BatteryVolPin     3
 
 // Digital
-#define CustomD3          3
-#define CustomD4          4
 #define MOSFET            5
-#define RTC_INT           6
-#define CustomD7          7
 #define ONEWIRE_DATA      8
-#define ACT_LED           9 // or custom use
+#define ACT_LED           9
 
 // Settings
-#define MEASURE_PERIOD    300 //300
-#define RETRY_PERIOD      10
-#define RETRY_ACK         5 // how many times try get ack
-#define ACK_TIME          10 // time for recive ack packet (in milisec)
-#define REPORT_EVERY      6 //5
-#define SMOOTH            3
-
-//#define ObwAnem 0.25434 // meters
-
-// Used devices and buses
-#define LDR               1
-#define ONEWIRE           0 // use 1wire bus
-#define I2C               1 // use i2c bus
-#define DEBUG             0 // debug mode - serial
-#define LED_ON            1 // use act led - transmission
-#define SOLAR             0 // use solar to charge batteries
-
+#define MEASURE_PERIOD    300 // how often to measure, in tenths of seconds
+#define RETRY_PERIOD      10 // how soon to retry if ACK didn't come in
+#define RETRY_ACK         5 // maximum number of times to retry
+#define ACK_TIME          10 // number of milliseconds to wait for an ack
+#define REPORT_EVERY      6 // report every N measurement cycles
+#define SMOOTH            3 // smoothing factor used for running averages
 #define RADIO_SYNC_MODE   2
+
+// VCC Levels
+#define VCC_OK            330  // 3.3V  
+#define VCC_LOW           310
+#define VCC_CRIT          300
+
+// Used devices or buses
+#define LDR               0 // use LDR sensor
+#define DS18B20           1 // use 1WIE DS18B20
+#define I2C               0 // use i2c bus for BMP085 and SHT21
+#define DEBUG             1 // debug mode - serial output
+#define LED_ON            1 // use act led for transmission
+#define SOLAR             0 // use solar to charge batteries and power sensnode
+#define HSM20G            0 // use analog humi/temp sensor HSM-20G http://www.seeedstudio.com/depot/datasheet/HSM-20G.pdf
+#define LM35              0 // use analog temperature sensor LM35 / not implementad
 
 #define rf12_sleep(x)
 
 /************************************************************/
+
+// structure of data
+typedef struct {
+  byte nodeid;
+  int light;
+  float humi;
+  float temp;
+  float pressure;
+  int battvol;
+  byte fet    :1;
+  byte lobat  :1;
+} Payload;
+Payload measure;
 
 ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 
@@ -81,13 +86,15 @@ enum { MEASURE, REPORT, TASKS };
 static word schedbuf[TASKS];
 Scheduler scheduler (schedbuf, TASKS);
 
-Port ldr (1);
-Port batvol (3);
+Port p1 (1); // JeeLabs Port 1
+Port p2 (2); // JeeLabs Port 2
+Port ldr (3);  // Analog 2
+Port batvol (4); // Analog 3
 
 byte count = 0;
 static byte reportCount;
 
-#if ONEWIRE
+#if DS18B20
     OneWire oneWire(ONEWIRE_DATA);
     DallasTemperature sensors(&oneWire);
 #endif
@@ -95,6 +102,7 @@ static byte reportCount;
 void setup()
 {
     rf12_initialize(NODEID, RF12_433MHZ, NODEGROUP);
+    rf12_control(0xC040); // 2.2v low
 
 #if I2C
     Wire.begin();
@@ -120,8 +128,7 @@ void setup()
   ldr.digiWrite2(0);
   
 }
-
-
+// Usage: smoothedAverage(payload.humi, humi, firstTime);
 static int smoothedAverage(int prev, int next, byte firstTime =0) {
     if (firstTime)
         return next;
@@ -197,7 +204,6 @@ static void doReportACK()
   #endif
 }
 
-
 static void doReport()
 {
   rf12_sleep(RF12_WAKEUP);
@@ -237,14 +243,13 @@ static void transmissionRS()
   activityLed(0);
 }
 
-
 static void activityLed (byte on) {
   pinMode(ACT_LED, OUTPUT);
   digitalWrite(ACT_LED, on);
   delay(150);
 }
 
-
+/*
 static void mosfetControl(byte on) {
   pinMode(MOSFET, OUTPUT);
   digitalWrite(MOSFET, on);
@@ -255,10 +260,14 @@ static byte pinState(int pin)
 {
   return digitalRead(pin) ? 1 : 0;
 }
+*/
 
 static void doMeasure() {
   count++;
-  byte firstTime = measure.humi == 0;
+//  byte firstTime = measure.humi == 0;
+  
+  measure.nodeid = NODEID;
+  measure.lobat = rf12_lowbat();
 #if LDR
   if ((count % 2) == 0) {
      measure.light = ldr.anaRead();
@@ -272,13 +281,13 @@ static void doMeasure() {
   BMP085.readSensor();
   measure.pressure = (BMP085.press*10) + 16;
 #endif
-#if ONEWIRE
+#if HSM20G
+  measure.humi = (31*analogRead(4)*3.30/1023);
+#endif
+#if DS18B20
   sensors.requestTemperatures();
-  float tempC = sensors.getTempCByIndex(0);
-  measure.temp = tempC;
+  measure.temp = sensors.getTempCByIndex(0);
 #endif
   measure.battvol = map(batvol.anaRead(), 0, 1023, 0, 660);
-  measure.nodeid = NODEID;
-  measure.lobat = rf12_lowbat();
 }
 

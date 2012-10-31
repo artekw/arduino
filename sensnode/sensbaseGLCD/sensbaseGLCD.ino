@@ -2,26 +2,22 @@
 #include <JeeLib.h>
 #include <avr/pgmspace.h>
 
-#include "utility/font_clR6x8.h"
+#include "utility/font_helvB24.h"
+#include "utility/font_helvB14.h"
+#include "utility/font_helvB12.h"
 #include "utility/font_clR4x6.h"
-#include "utility/font_clR6x6.h"
-#include "utility/font_courB18.h"
-#include "utility/font_ncenBI14.h"
-#include "utility/font_ncenR08.h""
-
-#define JSONRS 1 //JSON or SERIAL
-#define ACK    1
+#include "utility/font_clR6x8.h"
 
 char str[250];
-static byte ACT_LED         = 9; 
-static byte NODEID          = 31; // 31 - any node
+static byte NODEID          = 20; 
 static byte NODEGROUP       = 212;
+
+static byte brightness      = 9;
+static byte red_led         = 14;
 
 unsigned long last;
 
 GLCD_ST7565 glcd;
-
-extern byte gLCDBuf[1024];
 
 // structure of data
 typedef struct {
@@ -32,45 +28,35 @@ typedef struct {
 	float pressure;
 	byte lobat		:1;
 	int battvol;
-	int solvol;
-	byte solar		:1;
-	byte bat		:1;
+	byte fet		:1;
 } Payload;
 Payload measure;
 
+
 void setup () {
-  #if (JSONRS)
-    Serial.begin(115200);
-  #endif
+  Serial.begin(115200);
   rf12_initialize(NODEID, RF12_433MHZ, NODEGROUP);
   glcd.begin();
-  glcd.backLight(255);
+  glcd.backLight(200);
   last = millis();
+  glcd.clear();
+  pinMode(7, OUTPUT);
+  digitalWrite(7, HIGH);
 }
 
 void loop () {
-    if (rf12_recvDone() && rf12_crc == 0 && (rf12_hdr & RF12_HDR_CTL) == 0 && rf12_len == sizeof measure) {
-        memcpy(&measure, (void*) rf12_data, sizeof measure);
-        last = millis();
-        #if (ACK)
-          if (RF12_WANTS_ACK) {
-            rf12_sendStart(RF12_ACK_REPLY, 0, 0);
-          }
-        #endif  
-        if (JSONRS) {
-          createJSON();
-          outRS();
-        }
-        GLCD();
+  if (rf12_recvDone())
+  { 
+    if (rf12_crc == 0 && (rf12_hdr & RF12_HDR_CTL) == 0) {
+      measure = *(Payload*) rf12_data; 
+      last = millis();
     }
-    memset(str, 0, sizeof(str)); // clear
-    /*
-    if (millis()>lastTemp+10000){
-      sensors.requestTemperatures();
-      temp=(sensors.getTempCByIndex(0));
-      lastTemp=millis();
-      
-   }*/
+//  if (measure.nodeid == 2) {
+    glcd.clear();
+    draw_node_page();
+    glcd.refresh();
+//  }
+}
 }
 
 void outRS()
@@ -85,8 +71,8 @@ static void refreshAndWait() {
 }
 
 void GLCD() {
-  activityLed(1);
-  glcd.setFont(font_clR6x6);
+ // activityLed(1);
+  glcd.setFont(font_clR6x8);
   char stra[50];
   itoa(measure.nodeid, stra, 10);  
   glcd.drawString(0, 0, "ID Punktu: ");
@@ -121,39 +107,36 @@ void GLCD() {
   glcd.drawString(85, 37, stra);
   
   // last upd
-//  glcd.setFont(font_clR4x6);
-//  glcd.drawString(0,57, "Last update: ");
-//  int seconds = (int)((millis()-last)/1000.0);
-//  itoa(seconds,stra,10);
-//  strcat(stra,"s ago");
-//  glcd.drawString(50,57,stra);
+  glcd.setFont(font_clR4x6);
+  glcd.drawString(0,57, "Last update: ");
+  int seconds = (int)((millis()-last)/1000.0);
+  itoa(seconds,stra,10);
+  strcat(stra,"s ago");
+  glcd.drawString(50,57,stra);
 
-  glcd.drawString(0, 50, "Poz.napiecia:");
-  glcd.drawRect(0, 57, 127, 7, WHITE);
-  glcd.fillRect(0, 57, (measure.battvol)*0.252, 7, WHITE);
+//  glcd.drawString(0, 50, "Poz.napiecia:");
+//  glcd.drawRect(0, 57, 127, 7, WHITE);
+//  glcd.fillRect(0, 57, (measure.battvol)*0.252, 7, WHITE);
   
   //update
   refreshAndWait();
-  activityLed(0);
-}
-void createJSON()
-{  
-  srtJSON(str);
-  addJSON(str,"nodeid", measure.nodeid);
-  addJSON(str,"light", measure.light);
-  addJSON(str,"humi", measure.humi);
-  addJSON(str,"temp", measure.temp);
-  addJSON(str,"press", measure.pressure);
-  addJSON(str,"batvol", measure.battvol);
-  addJSON(str,"solvol", measure.solvol);
-  addJSON(str,"lobat", measure.lobat);
-  addJSON(str,"solon", measure.solar);
-  addJSON(str,"baton", measure.bat);
-  endJSON(str);
-}
 
+  //activityLed(0);
+}
+/*
 static void activityLed (byte on) {
   pinMode(ACT_LED, OUTPUT);
   digitalWrite(ACT_LED, !on);
   delay(150);
+}
+*/
+void draw_node_page()
+{
+  char stra[50];
+//  glcd.fillRect(0,0,128,64,0);
+  glcd.setFont(font_helvB14);
+  itoa(measure.temp, stra, 10);
+  glcd.drawString(0, 0, "Temp:");
+  strcat(stra, "C");
+  glcd.drawString(60, 0, stra);
 }

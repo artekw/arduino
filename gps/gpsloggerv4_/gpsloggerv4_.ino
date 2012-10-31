@@ -1,11 +1,11 @@
+
 // GPS Logger v4
 // Artur Wronowski <arteqw@gmail.com>
 
 #include <SoftwareSerial.h>
 #include <TinyGPS.h>
-#include <SD.h>s
-#include <avr/pgmspace.h>
-#include <avr/sleep.h>
+#include <SD.h>
+#include <JeeLib.h>
 
 // definicja pinów
 
@@ -17,8 +17,7 @@
 #define BATVOL 0
 #define CS 10
 #define BUFFSIZ 90 // plenty big
-#define SLEEP 2
-
+byte sleep = 2;
 
 SoftwareSerial GPS_Serial(RX_GPS, TX_GPS);
 TinyGPS gps;
@@ -33,9 +32,13 @@ char buffer[BUFFSIZ];
 char buffidx;
 uint8_t fix = 0;
 
+ISR(WDT_vect) { Sleepy::watchdogEvent(); }
+
 void setup() {
+  
   GPS_Serial.begin(9600);
   Serial.begin(9600);  
+  Serial.println("GPSLogger v4");
   Serial.println("Initializing SD card...");
   
   pinMode(CS, OUTPUT);
@@ -50,12 +53,11 @@ void setup() {
   
   pinMode(SYS_LED, OUTPUT);
   digitalWrite(SYS_LED, HIGH);
+  digitalWrite(ENGPS_LED, HIGH);
   
 }
 
 void loop() {
-  digitalWrite(ENGPS_LED, HIGH);
-  
   readline();
   
   if (strncmp(buffer, "$GPRMC",6) == 0) {
@@ -66,31 +68,39 @@ void loop() {
     
     if (p[0] == 'V') {
       fix = 0;
-      Serial.println("no fix");
+      Serial.print("_");
     } else {
       fix = 1;
+    }
   }
   
   if (!fix) {
     return;
+  } else {
+    digitalWrite(SYS_LED, HIGH);
   }
-  
-   digitalWrite(SYS_LED, HIGH);
   
    myFile = SD.open("test.txt", FILE_WRITE);
    if (myFile) {
      myFile.println(buffer);
+     Serial.println(buffer);
    }
    else {
      Serial.println("error opening test.txt");
    }
-   digitalWrite(SYS_LED, LOW);  
-  }
+  
   myFile.close();
   
-//  sleep_sec(SLEEP);
-//  digitalWrite(SYS_LED, LOW);
-  return;
+  for(int i = 0;i<89;i++)
+{
+   buffer[i] = '\0'; // clearing buffer
+}
+
+  Sleepy::loseSomeTime(60000);
+
+  digitalWrite(SYS_LED, LOW);
+  
+//  return;
 }
 
 void readline(void) {
@@ -112,27 +122,20 @@ void readline(void) {
   }
 }
 
-void sdwrite() {
-  digitalWrite(SYS_LED, HIGH);
-  delay(200);
-  digitalWrite(SYS_LED, LOW);
-  delay(200);
-}
-
-void sleep_sec(uint8_t x) {
-  while (x--) {
-     // set the WDT to wake us up!
-    WDTCSR |= (1 << WDCE) | (1 << WDE); // enable watchdog & enable changing it
-    WDTCSR = (1<< WDE) | (1 <<WDP2) | (1 << WDP1);
-    WDTCSR |= (1<< WDIE);
-    set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-    sleep_enable();
-    sleep_mode();
-    sleep_disable();
+void ledcode (byte code) {
+  switch (code) {
+    case 1: // SD Write
+      digitalWrite(SYS_LED, HIGH);
+      delay(200);
+      digitalWrite(SYS_LED, LOW);
+      delay(200);
+    break;
+    case 2: // Low battery
+      digitalWrite(SYS_LED, HIGH);
+      delay(50);
+      digitalWrite(SYS_LED, LOW);
+      delay(50);
+    break;
   }
 }
 
-SIGNAL(WDT_vect) {
-  WDTCSR |= (1 << WDCE) | (1 << WDE);
-  WDTCSR = 0;
-}

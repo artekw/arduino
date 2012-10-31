@@ -1,14 +1,10 @@
-
-
 // Ladyada's logger modified by Bill Greiman to use the SdFat library
 
 // this is a generic logger that does checksum testing so the data written should be always good
 // Assumes a sirf III chipset logger attached to pin 2 and 3
 
 #include <SD.h>
-
 #include <avr/sleep.h>
-#include "GPSconfig.h"
 
 // If using Arduino IDE prior to 1.0,
 // make sure to install newsoftserial from Mikal Hart
@@ -20,34 +16,23 @@
 #endif
 
 // power saving modes
-#define SLEEPDELAY 0
+#define SLEEPDELAY 10
 #define TURNOFFGPS 0
-#define LOG_RMC_FIXONLY 0
-
-// what to log
-#define LOG_RMC 1 // RMC-Recommended Minimum Specific GNSS Data, message 103,04
-#define LOG_GGA 0 // GGA-Global Positioning System Fixed Data, message 103,00
-#define LOG_GLL 0 // GLL-Geographic Position-Latitude/Longitude, message 103,01
-#define LOG_GSA 0 // GSA-GNSS DOP and Active Satellites, message 103,02
-#define LOG_GSV 0 // GSV-GNSS Satellites in View, message 103,03
-#define LOG_VTG 0 // VTG-Course Over Ground and Ground Speed, message 103,05
-
-
+#define LOG_RMC_FIXONLY 1
 
 // Use pins 2 and 3 to talk to the GPS. 2 is the TX pin, 3 is the RX pin
 #if ARDUINO >= 100
  SoftwareSerial gpsSerial =  SoftwareSerial(3, 2);
 #else
- NewSoftSerial gpsSerial =  NewSoftSerial(3, 2);
+ NewSoftSerial gpsSerial =  NewSoftSerial(2, 3);
 #endif
 // Set the GPSRATE to the baud rate of the GPS module. Most are 4800
 // but some are 38400 or other. Check the datasheet!
-#define GPSRATE 4800
+#define GPSRATE 9600
 
 // Set the pins used 
-#define powerPin 4
-#define led1Pin 5
-#define led2Pin 6
+#define powerPin 9
+#define led1Pin 6
 #define chipSelect 10
 
 
@@ -83,10 +68,8 @@ void error(uint8_t errno) {
   while(1) {
     for (i=0; i<errno; i++) {
       digitalWrite(led1Pin, HIGH);
-      digitalWrite(led2Pin, HIGH);
       delay(100);
       digitalWrite(led1Pin, LOW);
-      digitalWrite(led2Pin, LOW);
       delay(100);
     }
     for (; i<10; i++) {
@@ -101,9 +84,8 @@ void setup() {
   Serial.begin(9600);
   Serial.println("\r\nGPSlogger");
   pinMode(led1Pin, OUTPUT);
-  pinMode(led2Pin, OUTPUT);
   pinMode(powerPin, OUTPUT);
-  digitalWrite(powerPin, LOW);
+  digitalWrite(powerPin, HIGH);
 
   // make sure that the default chip select pin is set to
   // output, even if you don't use it:
@@ -136,59 +118,7 @@ void setup() {
   gpsSerial.begin(GPSRATE);
   
   Serial.println("Ready!");
-  
-  gpsSerial.print(SERIAL_SET);
-  delay(250);
 
-#if (LOG_DDM == 1)
-     gpsSerial.print(DDM_ON);
-#else
-     gpsSerial.print(DDM_OFF);
-#endif
-  delay(250);
-#if (LOG_GGA == 1)
-    gpsSerial.print(GGA_ON);
-#else
-    gpsSerial.print(GGA_OFF);
-#endif
-  delay(250);
-#if (LOG_GLL == 1)
-    gpsSerial.print(GLL_ON);
-#else
-    gpsSerial.print(GLL_OFF);
-#endif
-  delay(250);
-#if (LOG_GSA == 1)
-    gpsSerial.print(GSA_ON);
-#else
-    gpsSerial.print(GSA_OFF);
-#endif
-  delay(250);
-#if (LOG_GSV == 1)
-    gpsSerial.print(GSV_ON);
-#else
-    gpsSerial.print(GSV_OFF);
-#endif
-  delay(250);
-#if (LOG_RMC == 1)
-    gpsSerial.print(RMC_ON);
-#else
-    gpsSerial.print(RMC_OFF);
-#endif
-  delay(250);
-
-#if (LOG_VTG == 1)
-    gpsSerial.print(VTG_ON);
-#else
-    gpsSerial.print(VTG_OFF);
-#endif
-  delay(250);
-
-#if (USE_WAAS == 1)
-    gpsSerial.print(WAAS_ON);
-#else
-    gpsSerial.print(WAAS_OFF);
-#endif
 }
 
 void loop() {
@@ -266,7 +196,6 @@ void loop() {
       // rad. lets log it!
       Serial.print(buffer);
       Serial.print('#');
-      digitalWrite(led2Pin, HIGH);      // sets the digital pin as output
 
       // Bill Greiman - need to write bufferidx + 1 bytes to getCR/LF
       bufferidx++;
@@ -280,13 +209,11 @@ void loop() {
       }
       */
 
-      digitalWrite(led2Pin, LOW);
-
       bufferidx = 0;
 
       // turn off GPS module?
       if (TURNOFFGPS) {
-        digitalWrite(powerPin, HIGH);
+        digitalWrite(powerPin, LOW);
       }
 
       delay(SLEEPDELAY * 1000);

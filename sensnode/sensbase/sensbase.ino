@@ -18,13 +18,12 @@ typedef struct {
 	float pressure;
 	byte lobat		:1;
 	int battvol;
-//	int solvol;
 	byte fet		:1;
 } Payload;
 Payload measure;
 
 void setup () {
-  Serial.begin(115200);
+  Serial.begin(9600);
   rf12_initialize(NODEID, RF12_433MHZ, NODEGROUP);
   pinMode(ACT_LED, OUTPUT);
   activityLed(0);
