@@ -25,22 +25,22 @@ TODO:
 
 /*************************************************************/
 
-static byte NODEID    = 5;
+static byte NODEID    = 6;
 static byte NODEGROUP = 212;
 
 // Input/Output definition
 // Analog
-#define LDRPin            2
-#define BatteryVolPin     3
+#define LDR               2
+#define BAT_VOL           3
 
 // Digital
-#define MOSFET            5
+#define MOSFET            7
 #define ONEWIRE_DATA      8
 #define ACT_LED           9
 
 // Settings
-#define MEASURE_PERIOD    300 // how often to measure, in tenths of seconds
-#define RETRY_PERIOD      10 // how soon to retry if ACK didn't come in
+#define MEASURE_PERIOD    100 // how often to measure, in tenths of seconds
+#define RETRY_PERIOD      2  // how soon to retry if ACK didn't come in
 #define RETRY_ACK         5 // maximum number of times to retry
 #define ACK_TIME          10 // number of milliseconds to wait for an ack
 #define REPORT_EVERY      6 // report every N measurement cycles
@@ -48,18 +48,17 @@ static byte NODEGROUP = 212;
 #define RADIO_SYNC_MODE   2
 
 // VCC Levels
-#define VCC_OK            330  // 3.3V  
-#define VCC_LOW           310
-#define VCC_CRIT          300
+//#define VCC_OK            330  // 3.3V  
+//#define VCC_LOW           310
+//#define VCC_CRIT          300
 
 // Used devices or buses
 #define LDR               0 // use LDR sensor
-#define DS18B20           1 // use 1WIE DS18B20
+#define DS18B20           0 // use 1WIE DS18B20
 #define I2C               0 // use i2c bus for BMP085 and SHT21
 #define DEBUG             1 // debug mode - serial output
 #define LED_ON            1 // use act led for transmission
 #define SOLAR             0 // use solar to charge batteries and power sensnode
-#define HSM20G            0 // use analog humi/temp sensor HSM-20G http://www.seeedstudio.com/depot/datasheet/HSM-20G.pdf
 #define LM35              0 // use analog temperature sensor LM35 / not implementad
 
 #define rf12_sleep(x)
@@ -68,14 +67,15 @@ static byte NODEGROUP = 212;
 
 // structure of data
 typedef struct {
-  byte nodeid;
+  int nodeid;
   int light;
   float humi;
   float temp;
   float pressure;
+  byte lobat  :1;
   int battvol;
   byte fet    :1;
-  byte lobat  :1;
+
 } Payload;
 Payload measure;
 
@@ -86,10 +86,10 @@ enum { MEASURE, REPORT, TASKS };
 static word schedbuf[TASKS];
 Scheduler scheduler (schedbuf, TASKS);
 
-Port p1 (1); // JeeLabs Port 1
-Port p2 (2); // JeeLabs Port 2
-Port ldr (3);  // Analog 2
-Port batvol (4); // Analog 3
+Port p1 (1); // JeeLabs Port P1
+Port p2 (2); // JeeLabs Port P2
+//Port ldr (3);  // Analog pin 2
+//Port batvol (4); // Analog pin 3
 
 byte count = 0;
 static byte reportCount;
@@ -122,10 +122,8 @@ void setup()
   reportCount = REPORT_EVERY;
   scheduler.timer(MEASURE, 0);
   
-  pinMode(5, OUTPUT);
-  digitalWrite(5, LOW);
-  batvol.digiWrite2(0);
-  ldr.digiWrite2(0);
+//  batvol.digiWrite2(0);
+//  ldr.digiWrite2(0);
   
 }
 // Usage: smoothedAverage(payload.humi, humi, firstTime);
@@ -249,25 +247,14 @@ static void activityLed (byte on) {
   delay(150);
 }
 
-/*
-static void mosfetControl(byte on) {
-  pinMode(MOSFET, OUTPUT);
-  digitalWrite(MOSFET, on);
-  delay(100);
-}
-
-static byte pinState(int pin)
-{
-  return digitalRead(pin) ? 1 : 0;
-}
-*/
-
 static void doMeasure() {
   count++;
 //  byte firstTime = measure.humi == 0;
   
   measure.nodeid = NODEID;
   measure.lobat = rf12_lowbat();
+  measure.battvol = analogRead(3);
+//  
 #if LDR
   if ((count % 2) == 0) {
      measure.light = ldr.anaRead();
@@ -281,13 +268,10 @@ static void doMeasure() {
   BMP085.readSensor();
   measure.pressure = (BMP085.press*10) + 16;
 #endif
-#if HSM20G
-  measure.humi = (31*analogRead(4)*3.30/1023);
-#endif
+
 #if DS18B20
   sensors.requestTemperatures();
   measure.temp = sensors.getTempCByIndex(0);
 #endif
-  measure.battvol = map(batvol.anaRead(), 0, 1023, 0, 660);
 }
 

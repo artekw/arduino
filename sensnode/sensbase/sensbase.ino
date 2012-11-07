@@ -2,7 +2,7 @@
 #include <avr/pgmspace.h>
 
 #define JSON 1 // JSON
-#define SERIAL 0 // Serial
+#define SERIAL 1 // Serial
 
 char str[250];
 static byte ACT_LED       = 9;
