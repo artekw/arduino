@@ -1,142 +1,106 @@
 #include <GLCD_ST7565.h>		
 #include <JeeLib.h>
-#include <avr/pgmspace.h>
 
-#include "utility/font_helvB24.h"
-#include "utility/font_helvB14.h"
-#include "utility/font_helvB12.h"
-#include "utility/font_clR4x6.h"
+#include "utility/font_8x13B.h"
 #include "utility/font_clR6x8.h"
+#include "utility/font_clR6x6.h"
+#include "utility/font_clR5x8.h"
+#include "utility/font_5x7.h"
+#include "utility/font_4x6.h"
 
-char str[250];
-static byte NODEID          = 20; 
-static byte NODEGROUP       = 212;
+// choose right utilization
+#define PowerMeter 0
+#define WeatherStation 1 
 
-static byte brightness      = 9;
-static byte red_led         = 14;
+int send_id = 2;
 
-unsigned long last;
+int cval_use;
+double vrms;
+double usekwh = 0;
+unsigned long last_upd;
 
 GLCD_ST7565 glcd;
 
-// structure of data
-typedef struct {
-	int nodeid;
-	int light;
-	float humi;
-	float temp;
-	float pressure;
-	byte lobat		:1;
-	int battvol;
-	byte fet		:1;
-} Payload;
+ISR(WDT_vect) { Sleepy::watchdogEvent(); }
+
+#if PowerMeter 
+  typedef struct { int power1, power2, power3, power4; double Vrms;} Payload;
+#endif
+#if WeatherStation
+  typedef struct { byte nodeid; int light; float humi, temp, pressure; byte lobat  :1; int battvol; } Payload;
+#endif
 Payload measure;
 
-
 void setup () {
-  Serial.begin(115200);
-  rf12_initialize(NODEID, RF12_433MHZ, NODEGROUP);
+  #if PowerMeter
+    rf12_initialize(1, RF12_433MHZ, 210);
+  #endif
+  #if WeatherStation
+    rf12_initialize(1, RF12_433MHZ, 212);
+  #endif
   glcd.begin();
-  glcd.backLight(200);
-  last = millis();
-  glcd.clear();
-  pinMode(7, OUTPUT);
-  digitalWrite(7, HIGH);
+  glcd.backLight(150);
+  glcd.refresh();
+  showInfo();
 }
 
 void loop () {
-  if (rf12_recvDone())
-  { 
-    if (rf12_crc == 0 && (rf12_hdr & RF12_HDR_CTL) == 0) {
-      measure = *(Payload*) rf12_data; 
-      last = millis();
+  if (rf12_recvDone() && rf12_crc == 0 && rf12_len == sizeof measure) {
+    int node_id = (rf12_hdr & 0x1F);    // get node id
+    if (node_id == send_id) {
+      memcpy(&measure, (void*) rf12_data, sizeof measure);
+      last_upd = millis();
+      calculation();
+      showInfo();
     }
-//  if (measure.nodeid == 2) {
-    glcd.clear();
-    draw_node_page();
-    glcd.refresh();
-//  }
-}
+  }
 }
 
-void outRS()
-{
-  Serial.println(str);
+static void calculation() {
+  #if PowerMeter 
+    cval_use = cval_use + (measure.power1 - cval_use)*0.50;
+    usekwh += (measure.power1 * 0.2) / 3600000;
+  #endif
 }
 
-static void refreshAndWait() {	
-    glcd.refresh();
-    glcd.clear();
-    delay(1000);		
-}
+static void showInfo() {
+  char buf[10];
+  glcd.clear();
+  glcd.setFont(font_5x7);
+  #if PowerMeter 
+    glcd.drawString_P(70,  0, PSTR("power W"));
+    glcd.drawString_P(70,  22, PSTR("voltage V"));
+    glcd.drawString_P(70,  44, PSTR("use kWh"));
+  #endif
+  #if WeatherStation
+    glcd.drawString_P(70,  0, PSTR("press hPa"));
+    glcd.drawString_P(70,  22, PSTR("temp *C"));
+    glcd.drawString_P(70,  44, PSTR("humi %"));
+  #endif
+  // lasu update
+  glcd.setFont(font_4x6);
+  glcd.drawString_P(5,  55, PSTR("next upd"));
+  itoa(300-((millis()-last_upd)/1000), buf, 10);
+  strcat(buf,"s");
+  glcd.drawString(42, 55, buf);
 
-void GLCD() {
- // activityLed(1);
-  glcd.setFont(font_clR6x8);
-  char stra[50];
-  itoa(measure.nodeid, stra, 10);  
-  glcd.drawString(0, 0, "ID Punktu: ");
-  glcd.drawString(85, 0, stra);
+  glcd.setFont(font_8x13B);
+  #if PowerMeter
+    itoa((int)cval_use, buf, 10);
+    glcd.drawString(72, 8, buf);
+    dtostrf(measure.Vrms, 0, 1, buf); 
+    glcd.drawString(72, 30, buf);
+    dtostrf(usekwh, 0, 1, buf);
+    glcd.drawString(72, 52, buf);
+  #endif
+  #if WeatherStation
+    dtostrf(measure.pressure, 0, 1, buf);
+    glcd.drawString(72, 8, buf);
+    dtostrf(measure.temp, 0, 1, buf); 
+    glcd.drawString(72, 30, buf);
+    dtostrf(measure.humi, 0, 1, buf);
+    glcd.drawString(72, 52, buf);
+  #endif
+  glcd.refresh();
+}
   
-  // press
-  itoa(measure.pressure, stra, 10);
-  strcat(stra,"hPa");
-  glcd.drawString(0, 8, "Cisnienie:");
-  glcd.drawString(85, 8, stra);
-
-  // temp
-  itoa(measure.temp, stra, 10);
-  strcat(stra,"C");
-  glcd.drawString(0, 15, "Temperatura:");
-  glcd.drawString(85, 15, stra);
-  
-  // humi
-  itoa(measure.humi, stra, 10);
-  strcat(stra,"%");
-  glcd.drawString(0, 23, "Wilgotnosc:");
-  glcd.drawString(85, 23, stra);
-  
-  // light
-  itoa(measure.light, stra, 10);
-  glcd.drawString(0, 30, "Jasnosc:");
-  glcd.drawString(85, 30, stra);
- 
-  // batvol
-  itoa(measure.battvol, stra, 10);
-  glcd.drawString(0, 37, "Nap. zas:");
-  glcd.drawString(85, 37, stra);
-  
-  // last upd
-  glcd.setFont(font_clR4x6);
-  glcd.drawString(0,57, "Last update: ");
-  int seconds = (int)((millis()-last)/1000.0);
-  itoa(seconds,stra,10);
-  strcat(stra,"s ago");
-  glcd.drawString(50,57,stra);
-
-//  glcd.drawString(0, 50, "Poz.napiecia:");
-//  glcd.drawRect(0, 57, 127, 7, WHITE);
-//  glcd.fillRect(0, 57, (measure.battvol)*0.252, 7, WHITE);
-  
-  //update
-  refreshAndWait();
-
-  //activityLed(0);
-}
-/*
-static void activityLed (byte on) {
-  pinMode(ACT_LED, OUTPUT);
-  digitalWrite(ACT_LED, !on);
-  delay(150);
-}
-*/
-void draw_node_page()
-{
-  char stra[50];
-//  glcd.fillRect(0,0,128,64,0);
-  glcd.setFont(font_helvB14);
-  itoa(measure.temp, stra, 10);
-  glcd.drawString(0, 0, "Temp:");
-  strcat(stra, "C");
-  glcd.drawString(60, 0, stra);
-}

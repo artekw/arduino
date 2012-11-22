@@ -28,14 +28,13 @@ TODO:
 
 // structure of data
 typedef struct {
-	int nodeid;
+	byte nodeid;
 	int light;
 	float humi;
 	float temp;
 	float pressure;
 	byte lobat		:1;
 	int battvol;
-	byte fet		:1;
 } Payload;
 Payload measure;
 

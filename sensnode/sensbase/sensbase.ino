@@ -1,8 +1,8 @@
 #include <JeeLib.h>
-#include <avr/pgmspace.h>
+//#include <avr/pgmspace.h>
 
 #define JSON 1 // JSON
-#define SERIAL 1 // Serial
+#define SERIAL 0 // Serial
 
 char str[250];
 static byte ACT_LED       = 9;
@@ -11,17 +11,22 @@ static byte NODEGROUP     = 212;
 
 // structure of data
 typedef struct {
-	int nodeid;
+	byte nodeid;
 	int light;
 	float humi;
 	float temp;
 	float pressure;
 	byte lobat		:1;
 	int battvol;
-	byte fet		:1;
 } Payload;
 Payload measure;
 
+/*
+typedef struct {
+	byte nodeid;
+} PayloadOut;
+Payload request;
+*/
 void setup () {
   Serial.begin(9600);
   rf12_initialize(NODEID, RF12_433MHZ, NODEGROUP);
@@ -75,10 +80,7 @@ void createJSON()
   addJSON(str,"temp",  measure.temp);
   addJSON(str,"press",  measure.pressure);
   addJSON(str,"batvol",  measure.battvol);
-//  addJSON(str,"solvol",  measure.solvol);
   addJSON(str,"lobat", measure.lobat);
-//  addJSON(str,"solon", measure.solar);
-//  addJSON(str,"baton", measure.bat);
   endJSON(str);
 }
 

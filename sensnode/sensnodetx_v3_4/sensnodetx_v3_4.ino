@@ -39,43 +39,36 @@ static byte NODEGROUP = 212;
 #define ACT_LED           9
 
 // Settings
-#define MEASURE_PERIOD    100 // how often to measure, in tenths of seconds
-#define RETRY_PERIOD      2  // how soon to retry if ACK didn't come in
+#define MEASURE_PERIOD    300 // how often to measure, in tenths of seconds
+#define RETRY_PERIOD      5  // how soon to retry if ACK didn't come in
 #define RETRY_ACK         5 // maximum number of times to retry
 #define ACK_TIME          10 // number of milliseconds to wait for an ack
 #define REPORT_EVERY      6 // report every N measurement cycles
 #define SMOOTH            3 // smoothing factor used for running averages
 #define RADIO_SYNC_MODE   2
 
-// VCC Levels
-//#define VCC_OK            330  // 3.3V  
-//#define VCC_LOW           310
-//#define VCC_CRIT          300
-
 // Used devices or buses
 #define LDR               0 // use LDR sensor
 #define DS18B20           0 // use 1WIE DS18B20
-#define I2C               0 // use i2c bus for BMP085 and SHT21
+#define I2C               1 // use i2c bus for BMP085 and SHT21
 #define DEBUG             1 // debug mode - serial output
 #define LED_ON            1 // use act led for transmission
 #define SOLAR             0 // use solar to charge batteries and power sensnode
 #define LM35              0 // use analog temperature sensor LM35 / not implementad
 
-#define rf12_sleep(x)
+  #define rf12_sleep(x)
 
 /************************************************************/
 
 // structure of data
 typedef struct {
-  int nodeid;
+  byte nodeid;
   int light;
   float humi;
   float temp;
   float pressure;
   byte lobat  :1;
   int battvol;
-  byte fet    :1;
-
 } Payload;
 Payload measure;
 
@@ -126,13 +119,15 @@ void setup()
 //  ldr.digiWrite2(0);
   
 }
+
 // Usage: smoothedAverage(payload.humi, humi, firstTime);
-static int smoothedAverage(int prev, int next, byte firstTime =0) {
+
+/*static int smoothedAverage(int prev, int next, byte firstTime =0) {
     if (firstTime)
         return next;
     return ((SMOOTH - 1) * prev + next + SMOOTH / 2) / SMOOTH;
 }
-
+*/
 void loop()
 {
   #if DEBUG
@@ -247,14 +242,53 @@ static void activityLed (byte on) {
   delay(150);
 }
 
+
+long readVcc() {
+  // Read 1.1V reference against AVcc
+  // set the reference to Vcc and the measurement to the internal 1.1V reference
+  #if defined(__AVR_ATmega32U4__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+    ADMUX = _BV(REFS0) | _BV(MUX4) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+  #elif defined (__AVR_ATtiny24__) || defined(__AVR_ATtiny44__) || defined(__AVR_ATtiny84__)
+    ADMUX = _BV(MUX5) | _BV(MUX0);
+  #elif defined (__AVR_ATtiny25__) || defined(__AVR_ATtiny45__) || defined(__AVR_ATtiny85__)
+    ADMUX = _BV(MUX3) | _BV(MUX2);
+  #else
+    ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+  #endif  
+ 
+  delay(2); // Wait for Vref to settle
+  ADCSRA |= _BV(ADSC); // Start conversion
+  while (bit_is_set(ADCSRA,ADSC)); // measuring
+ 
+  uint8_t low  = ADCL; // must read ADCL first - it then locks ADCH  
+  uint8_t high = ADCH; // unlocks both
+ 
+  long result = (high<<8) | low;
+ 
+  result = 1125300L / result; // Calculate Vcc (in mV); 1125300 = 1.1*1023*1000
+  return result; // Vcc in millivolts
+}
+
+long readVcc2() {
+  long result;
+  // Read 1.1V reference against AVcc
+  ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+  delay(2); // Wait for Vref to settle
+  ADCSRA |= _BV(ADSC); // Convert
+  while (bit_is_set(ADCSRA,ADSC));
+  result = ADCL;
+  result |= ADCH<<8;
+  result = 1126400L / result; // Back-calculate AVcc in mV
+  return result;
+}
+
 static void doMeasure() {
   count++;
 //  byte firstTime = measure.humi == 0;
   
   measure.nodeid = NODEID;
   measure.lobat = rf12_lowbat();
-  measure.battvol = analogRead(3);
-//  
+
 #if LDR
   if ((count % 2) == 0) {
      measure.light = ldr.anaRead();
@@ -273,5 +307,7 @@ static void doMeasure() {
   sensors.requestTemperatures();
   measure.temp = sensors.getTempCByIndex(0);
 #endif
+//  measure.battvol = readVcc();
+
 }
 

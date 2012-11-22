@@ -2,14 +2,14 @@
 
 typedef struct {
 	int lp;
-	float temperatura;
+	int bat;
 } Payload;
 Payload pomiar;
 
 void setup () {
     Serial.begin(57600);
     Serial.println("\n[Sensnode Demo]");
-    rf12_initialize('R', RF12_433MHZ, 212);
+    rf12_initialize('R', RF12_433MHZ, 210);
 }
 
 void loop () {
@@ -19,7 +19,7 @@ void loop () {
         Serial.print("LP");
         Serial.print(pomiar.lp);
         Serial.print(" T");
-        Serial.print(pomiar.temperatura);
+        Serial.print(pomiar.bat);
         Serial.println();
     }
 }
