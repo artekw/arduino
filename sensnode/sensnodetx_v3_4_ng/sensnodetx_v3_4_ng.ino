@@ -2,7 +2,7 @@
 SensnodeTX v3.4-dev
 Written by Artur Wronowski <artur.wronowski@digi-led.pl>
 Works with optiboot too.
-Need Arduino 1.0 do compile
+Need Arduino 1.0 to compile
 
 TODO:
 - pomiar napiecia bateri, skalowanie czasu pomiedzy pomiarami w zaleznosci od panujacego napiecia
@@ -23,12 +23,33 @@ TODO:
 #include <JeeLib.h>
 // avr sleep instructions
 #include <avr/sleep.h>
+// DHT11
+#include "DHT.h"
+
+#if DHT11
+  DHT dht(4, DHT11);
+#endif
 
 /*************************************************************/
 
-#define myNodeID            2
-#define network             212
-#define NEW_REV             0 // 3.0 or 3.4
+#define myNodeID            15
+#define network             210
+#define NEW_REV             1 // 3.0 or 3.4
+
+// Settings
+//#define SMOOTH              3 // smoothing factor used for running averages
+#define PERIOD              1 // minutes
+#define RADIO_SYNC_MODE     2 // http://jeelabs.net/pub/docs/jeelib/RF12_8h.html#a6843bbc70df373dbffa0b3d1f33ef0ae
+
+// Used devices or buses (1 on 0)
+#define LDR                 0 // use LDR sensor
+#define DS18B20             1 // use 1WIE DS18B20
+#define I2C                 0 // use i2c bus for BMP085 and SHT21
+#define DEBUG               1 // debug mode - serial output
+#define LED_ON              0 // use act led for transmission
+#define DHT11               1 // DHT11
+
+/*************************************************************/
 
 // Input/Output definition
 // Analog
@@ -36,7 +57,7 @@ TODO:
   #define LDR               2
   #define BAT_VOL           3
 #else //3.0
-  #define LDR               0  
+  #define LDR               0
   #define BAT_VOL           1
   #define CustomA3          3
 #endif
@@ -54,28 +75,16 @@ TODO:
   #define ACT_LED           9
 #endif
 
-// Settings
-#define SMOOTH            3 // smoothing factor used for running averages
-#define PERIOD            5 // sec
-#define RADIO_SYNC_MODE   2 // http://jeelabs.net/pub/docs/jeelib/RF12_8h.html#a6843bbc70df373dbffa0b3d1f33ef0ae
-
-// Used devices or buses (1 on 0)
-#define LDR               0 // use LDR sensor
-#define DS18B20           0 // use 1WIE DS18B20
-#define I2C               1 // use i2c bus for BMP085 and SHT21
-#define DEBUG             0 // debug mode - serial output
-#define LED_ON            0 // use act led for transmission
-
 /************************************************************/
 
 // structure of received data
+
 typedef struct {
-  byte nodeid;
   int light;
-  float humi;
-  float temp;
-  float pressure;
-  byte lobat  :1;
+  int humi;
+  int temp;
+  int pressure;
+  byte lobat      :1;
   int battvol;
 } Payload;
 Payload measure;
@@ -83,11 +92,13 @@ Payload measure;
 ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 
 #if NEW_REV
-  Port p1 (1); // JeeLabs Port P1
+  //Port p1 (1); // JeeLabs Port P1
   Port p2 (2); // JeeLabs Port P2
   Port ldr (3);  // Analog pin 2
   Port batvol (4); // Analog pin 3
 #endif
+
+
 
 byte count = 0;
 int tempReading;
@@ -103,7 +114,7 @@ void setup()
     rf12_control(0xC040); // 2.2v low
 
 #if I2C
-    Wire.begin(); 
+    Wire.begin();
 #endif
 
 #if DEBUG
@@ -120,7 +131,7 @@ void loop()
 {
   doMeasure(); // mierz
   #if DEBUG
-     transmissionRS();	
+     transmissionRS();
   #endif
   #if LED_ON
     activityLed(1);
@@ -129,7 +140,7 @@ void loop()
   #if LED_ON
     activityLed(0);
   #endif
-  
+
   for (byte t = 0; t < PERIOD; t++)  // spij
     Sleepy::loseSomeTime(60000);
 }
@@ -160,8 +171,10 @@ static void transmissionRS()
   Serial.println(measure.lobat, DEC);
   Serial.print("BATVOL ");
   Serial.println(measure.battvol);
+  /*
   Serial.print("VCCREF ");
   Serial.println(readVcc());
+  */
   activityLed(0);
 }
 
@@ -170,7 +183,7 @@ static void activityLed (byte on) {
   digitalWrite(ACT_LED, on);
   delay(150);
 }
-
+/*
  long readVcc() {
    long result;
    // Read 1.1V reference against Vcc
@@ -183,32 +196,6 @@ static void activityLed (byte on) {
    result = 1126400L / result; // Back-calculate Vcc in mV
    return result;
    ADCSRA &= ~ bit(ADEN); bitSet(PRR, PRADC); // Disable the ADC to save power
-}
-/*
-long readVcc() {
-  // Read 1.1V reference against AVcc
-  // set the reference to Vcc and the measurement to the internal 1.1V reference
-  #if defined(__AVR_ATmega32U4__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
-    ADMUX = _BV(REFS0) | _BV(MUX4) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
-  #elif defined (__AVR_ATtiny24__) || defined(__AVR_ATtiny44__) || defined(__AVR_ATtiny84__)
-    ADMUX = _BV(MUX5) | _BV(MUX0);
-  #elif defined (__AVR_ATtiny25__) || defined(__AVR_ATtiny45__) || defined(__AVR_ATtiny85__)
-    ADMUX = _BV(MUX3) | _BV(MUX2);
-  #else
-    ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
-  #endif  
- 
-  delay(2); // Wait for Vref to settle
-  ADCSRA |= _BV(ADSC); // Start conversion
-  while (bit_is_set(ADCSRA,ADSC)); // measuring
- 
-  uint8_t low  = ADCL; // must read ADCL first - it then locks ADCH  
-  uint8_t high = ADCH; // unlocks both
- 
-  long result = (high<<8) | low;
- 
-  result = 1125300L / result; // Calculate Vcc (in mV); 1125300 = 1.1*1023*1000
-  return result; // Vcc in millivolts
 }
 */
 static void doMeasure() {
@@ -233,28 +220,43 @@ static void doMeasure() {
 
 //  measure.battvol = readVcc();
   Serial.print(".");
-  measure.nodeid = myNodeID;
+  //measure.nodeid = myNodeID;
   measure.lobat = rf12_lowbat();
 
 #if LDR
   if ((count % 2) == 0) {
      measure.light = ldr.anaRead();
   }
+  /*
+    def get_light_level(self):
+    result = self.adc.readADC(self.adcPin) + 1
+    vout = float(result)/1023 * 3.3
+    rs = ((3.3 - vout) / vout) * 5.6
+    return abs(rs)
+    */
 #endif
 
 #if I2C
-  measure.humi = SHT2x.GetHumidity();
-  measure.temp = SHT2x.GetTemperature();
+  float shthumi = SHT2x.GetHumidity();
+  float shttemp = SHT2x.GetTemperature();
+  measure.humi = shthumi * 10;
+  measure.temp = shttemp * 10;
   Sleepy::loseSomeTime(250);
   BMP085.getCalData();
   BMP085.readSensor();
-  measure.pressure = (BMP085.press*10) + 16;
+  measure.pressure = (BMP085.press*10*10) + 16;
 #endif
 
 #if DS18B20
   sensors.requestTemperatures();
   Sleepy::loseSomeTime(750);
-  measure.temp = sensors.getTempCByIndex(0);
+  float tmp = sensors.getTempCByIndex(0);
+  measure.temp = tmp * 10;
+#endif
+
+#if DHT11
+  float h = dht.readHumidity();
+  measure.humi = h;
 #endif
 }
 

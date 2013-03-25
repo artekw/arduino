@@ -1,22 +1,22 @@
 #include <JeeLib.h>
 #include <avr/sleep.h>
 
+#define FET 7
+
 typedef struct {
-	int lp;
+	long lp;
 	int bat;
 } Payload;
 Payload pomiar;
-
-//#define rf12_sleep(x)
 
 ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 
 MilliTimer sendTimer;
 void setup () {
-    rf12_initialize(1, RF12_433MHZ, 210);
+    rf12_initialize(12, RF12_433MHZ, 210);
     pinMode(9, OUTPUT);
     pomiar.lp=0;
-    rf12_sleep(RF12_SLEEP);
+ //   rf12_sleep(RF12_SLEEP);
 }
 
 long readVcc() {
@@ -47,21 +47,20 @@ long readVcc() {
 }
 
 void loop () {
-        pomiar.bat = map(analogRead(3),0,1023,0,6600);
 
-  digitalWrite(9, LOW);
-  rf12_sleep(RF12_SLEEP);
-    rf12_recvDone();
-    if (rf12_canSend() && sendTimer.poll(5000)) {
-      rf12_sendStart(0, &pomiar, sizeof pomiar,1);
+  pomiar.bat = map(analogRead(3),0,1023,0,6600);
+  //pomiar.bat = readVcc();
 
-  pomiar.lp += 1;
-    
   digitalWrite(9, HIGH);
+ // rf12_sleep(RF12_SLEEP);
+    rf12_recvDone();
+    if (rf12_canSend()) {
+      rf12_sendStart(0, &pomiar, sizeof pomiar,1);
+      pomiar.lp += 1;
+      digitalWrite(9, LOW);
     }
-  rf12_sleep(RF12_WAKEUP);
+ // rf12_sleep(RF12_WAKEUP);
   
-Sleepy::loseSomeTime(2000);
-  
+Sleepy::loseSomeTime(5000);
 
 }

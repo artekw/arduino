@@ -1,32 +1,15 @@
+// sensbase v2.0
+
 #include <JeeLib.h>
-//#include <avr/pgmspace.h>
 
-#define JSON 1 // JSON
-#define SERIAL 0 // Serial
+// Output
+#define BINARY 1 // rf12demo https://github.com/jcw/jeelib/blob/master/examples/RF12/RF12demo/RF12demo.ino
 
-char str[250];
+char str[100];
 static byte ACT_LED       = 9;
 static byte NODEID        = 31;  // 31 for any node(all)
-static byte NODEGROUP     = 212;
+static byte NODEGROUP     = 210; // 0-255
 
-// structure of data
-typedef struct {
-	byte nodeid;
-	int light;
-	float humi;
-	float temp;
-	float pressure;
-	byte lobat		:1;
-	int battvol;
-} Payload;
-Payload measure;
-
-/*
-typedef struct {
-	byte nodeid;
-} PayloadOut;
-Payload request;
-*/
 void setup () {
   Serial.begin(9600);
   rf12_initialize(NODEID, RF12_433MHZ, NODEGROUP);
@@ -35,53 +18,31 @@ void setup () {
 }
 
 void loop () {
-    if (rf12_recvDone() && rf12_crc == 0 && (rf12_hdr & RF12_HDR_CTL) == 0 && rf12_len == sizeof measure) {
-        memcpy(&measure, (void*) rf12_data, sizeof measure);
+    if (rf12_recvDone()) {
         activityLed(1);
         delay(2);
         activityLed(0);
-        if (RF12_WANTS_ACK) {
-          #if (!JSON)
-            activityLed(1);
-            Serial.println("-----");
-            Serial.println("-> ack");
-            activityLed(0);
-          #endif
-          rf12_sendStart(RF12_ACK_REPLY, 0, 0);
+        // crc OK
+        if (rf12_crc == 0 && (rf12_hdr & RF12_HDR_CTL) == 0) {
+          int node_id = (rf12_hdr & 0x1F);
+          if (BINARY) {
+            byte n = rf12_len;
+            Serial.print("OK");
+            Serial.print(' ');
+            Serial.print((int) rf12_hdr);
+            for (byte i = 0; i < n; ++i) {
+              Serial.print(' ');
+              Serial.print((int) rf12_data[i]);
+            }
+            Serial.print(' ');
+            Serial.println();
+          }
+          if (RF12_WANTS_ACK) {
+            rf12_sendStart(RF12_ACK_REPLY, 0, 0);
         }
-        if (JSON) {        
-          createJSON();
-          transmission();
-        }
-        if (SERIAL) {
-          Serial.flush();
-          Serial.print(measure.temp);
-          Serial.print(" ");
-          Serial.print(measure.pressure);
-          Serial.print(" ");
-          Serial.print(measure.humi);
-          Serial.println(" ");
-        }
+      }
        memset(str, 0, sizeof(str)); // clear
    }
-}
-
-void transmission()
-{
-  Serial.println(str);
-}
-
-void createJSON()
-{  
-  srtJSON(str);
-  addJSON(str,"nodeid", measure.nodeid);
-  addJSON(str,"light",  measure.light);
-  addJSON(str,"humi",  measure.humi);
-  addJSON(str,"temp",  measure.temp);
-  addJSON(str,"press",  measure.pressure);
-  addJSON(str,"batvol",  measure.battvol);
-  addJSON(str,"lobat", measure.lobat);
-  endJSON(str);
 }
 
 static void activityLed (byte on) {
