@@ -11,12 +11,12 @@
 #include "utility/font_lubB24.h"
 
 // choose right utilization
-#define PowerMeter 1
-#define WeatherStation 0
+#define PowerMeter 0
+#define WeatherStation 1
 
 #define NUMHIST 20
 
-int send_id = 25; // shield emonTX
+int send_id = 2; // shield emonTX
 int cval_use;
 double vrms;
 double usekwh = 0;
@@ -27,16 +27,17 @@ word dataHist [NUMHIST];
 GLCD_ST7565 glcd;
 
 //ISR(WDT_vect) { Sleepy::watchdogEvent(); }
-/*
-#if PowerMeter
-  typedef struct { int power1, power2, power3, power4; double Vrms;} Payload;
-#endif
-#if WeatherStation
-  typedef struct { byte nodeid; int light; float humi, temp, pressure; byte lobat  :1; int battvol; } Payload;
-#endif
-Payload measure;
-*/
 
+typedef struct {
+  int light;
+  int humi;
+  int temp;
+  int pressure;
+  byte lobat      :1;
+  int battvol;
+} Payload;
+Payload measure;
+/*
 typedef struct {
   int power1;
   int power2;
@@ -45,6 +46,7 @@ typedef struct {
   int Vrms;
 } Payload;
 Payload measure;
+*/
 
 void setup () {
   Serial.begin(9600);
@@ -60,11 +62,13 @@ void setup () {
   rf12_initialize(21, RF12_433MHZ, 210);
 
   glcd.begin();
-  glcd.backLight(180);
+  glcd.backLight(120);
   glcd.refresh();
+  /*
   #if WeatherStation
     loadHist();
   #endif
+  */
   showInfo();
   //debug();
 }
@@ -73,12 +77,13 @@ void loop () {
   showInfo();
   if (rf12_recvDone() && rf12_crc == 0 && rf12_len == sizeof measure) {
     int node_id = (rf12_hdr & 0x1F);    // get node id
+    Serial.println(node_id);
     if (node_id == send_id) {
       memcpy(&measure, (void*) rf12_data, sizeof measure);
       last_upd = millis();
-      calculation();
-      scroll();
-      debug();
+      //calculation();
+      //scroll();
+      //debug();
       //showGraph();
       showInfo();
       //updEEPROM();
@@ -96,7 +101,7 @@ static void calculation() {
     dataHist[NUMHIST-1] = ((int)measure.temp);
   #endif
 }
-
+/*
 static void headerandfooter()
 {
   char buf[10];
@@ -162,6 +167,14 @@ static void debug()
     Serial.print(measure.power3);
     Serial.println(" ");
   #endif
+  #if WeatherStation
+    Serial.print(measure.temp);
+    Serial.print(" ");
+    Serial.print(measure.humi);
+    Serial.print(" ");
+    Serial.print(measure.pressure);
+    Serial.println(" ");
+  #endif
 }
 
 static void showGraph()
@@ -198,7 +211,7 @@ static void showGraph()
     #endif
   }
 }
-
+*/
 static void showInfo() {
   char buf[10];
   glcd.clear();
@@ -212,10 +225,11 @@ static void showInfo() {
 
   #endif
   #if WeatherStation
-    glcd.setFont(font_5x7);
-    glcd.drawString_P(70,  0, PSTR("press hPa"));
-    glcd.drawString_P(70,  22, PSTR("temp *C"));
-    glcd.drawString_P(70,  44, PSTR("humi %"));
+    glcd.setFont(font_4x6);
+    glcd.drawString_P(0, 44, PSTR("Vbat V"));
+    glcd.drawString_P(42, 44, PSTR("Wilg %"));
+    glcd.drawString_P(82, 44, PSTR("Cisn kHa"));
+    glcd.drawString_P(0,  0, PSTR("Temperatura"));
   #endif
 
   glcd.setFont(font_clR6x8);
@@ -230,22 +244,32 @@ static void showInfo() {
     glcd.drawString(92, 54, buf);
     glcd.drawLine(0, 40, 128, 40, 1);
 
+    //big
     glcd.setFont(font_lubB24);
     itoa((int)cval_use, buf, 10);
     strcat(buf," W");
     glcd.drawString(2, 8, buf);
   #endif
   #if WeatherStation
-    dtostrf(measure.pressure, 0, 1, buf);
-    glcd.drawString(72, 8, buf);
-    dtostrf(measure.temp, 0, 1, buf);
-    glcd.drawString(72, 30, buf);
-    dtostrf(measure.humi, 0, 1, buf);
-    glcd.drawString(72, 52, buf);
+    dtostrf((float)measure.battvol/1000, 0, 1, buf);
+    glcd.drawString(0, 54, buf);
+    dtostrf((float)measure.humi/10, 0, 1, buf);
+    glcd.drawString(42, 54, buf);
+    dtostrf((float)measure.pressure/10, 0, 1, buf);
+    glcd.drawString(82, 54, buf);
+    glcd.drawLine(0, 40, 128, 40, 1);
+
+    // big
+    glcd.setFont(font_lubB24);
+    dtostrf((float)measure.temp/10, 0, 1, buf);
+    strcat(buf," *C");
+    glcd.drawString(2, 8, buf);
   #endif
+    /*
   #if WeatherStation
     headerandfooter();
   #endif
+  */
   //showGraph();
   glcd.refresh();
 }
