@@ -27,7 +27,7 @@ TODO:
 
 /*************************************************************/
 
-#define NODEID              15
+#define NODEID              15  // (from 1 to 30)
 #define NETWORK             210
 #define NEW_REV                 // comment for old revision  (3.0 or 3.4)
 
@@ -47,7 +47,7 @@ TODO:
 
 #define LED_ON                 // use act led for transmission
 
-#define DEBUG                  // debug mode - serial output
+//#define DEBUG                  // debug mode - serial output
 
 /*************************************************************/
 
@@ -283,7 +283,6 @@ static void doMeasure() {
   float h = dht.readHumidity();
   float t = dht.readTemperature();
   if (isnan(h) || isnan(t)) {
-    Serial.println("Failed to read from DHT sensor!");
     return;
   }
   else {
