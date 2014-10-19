@@ -1,63 +1,75 @@
 /*
 SensnodeTX v3.4-dev
 Written by Artur Wronowski <artur.wronowski@digi-led.pl>
-Documentation: http://lab.digi-led.pl/wiki/doku.php/sensnodetx
-Works with optiboot too.
 Need Arduino 1.0 to compile
 
-
 TODO:
+- pomiar napiecia bateri, skalowanie czasu pomiedzy pomiarami w zaleznosci od panujacego napiecia
 - srednia z pomiarow
 - wiartomierz //#define ObwAnem 0.25434 // meters
-- Making accurate ADC readings on the Arduino http://hacking.majenko.co.uk/node/57
+- http://hacking.majenko.co.uk/node/57
 */
 
 // libs for I2C and DS18B20
-#include <dht11.h>
 #include <Wire.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 // lisb for SHT21 and BMP085
 #include <BMP085.h>
 #include <SHT2x.h>
-
+//#include <Adafruit_BMP085.h>
 // lib for RFM12B from https://github.com/jcw/jeelib
 #include <JeeLib.h>
-// DHT11 Sensor
-
 // avr sleep instructions
 #include <avr/sleep.h>
+// DHT11 and DHT22 from https://github.com/adafruit/DHT-sensor-library
+#include "DHT.h"
 
 /*************************************************************/
-// Network settings
-#define myNodeID            19          // Node ID
-#define network             210         // 
-#define band                RF12_433MHZ // Band
 
-// Hardware settings
-#define NEW_REV             1       // sensnodeTx Revision: 3.0 or 3.4; Use 1 if don't know
+#define NODEID              15
+#define NETWORK             210
+#define NEW_REV                 // comment for old revision  (3.0 or 3.4)
 
-// Transmission settings
-#define RADIO_SYNC_MODE     2       // http://jeelabs.net/pub/docs/jeelib/RF12_8h.html#a6843bbc70df373dbffa0b3d1f33ef0ae
-#define LOWRATE             0       // force 9.6kbps for better reception of radio http://forum.jeelabs.net/node/1086 ; All node need to use the same datarate!
+// Settings
+//#define SMOOTH            3   // smoothing factor used for running averages
+#define PERIOD              1   // minutes
+#define RADIO_SYNC_MODE     2   // http://jeelabs.net/pub/docs/jeelib/RF12_8h.html#a6843bbc70df373dbffa0b3d1f33ef0ae
 
-// Used devices or buses (1 on 0)
-#define LDR                 0       // use LDR sensor
-#define DS18B20             0       // use 1WIRE DS18B20
-#define I2C                 1       // use i2c bus for BMP085 and SHT21
-#define DEBUG               0       // debug mode - serial output
-#define LED_ON              0       // use act led for transmission, faster battery drain
-#define DHT11               0       // DHT11 Sensor; Use P1 port
+// Used devices or buses (comment on uncommentif not used)
+#define LDR                    // use LDR sensor
+#define DS18B20                // use 1WIE DS18B20
 
-// Additional settings for devices
-#define DHT11PIN            4      // DHT11 Sensor use P1 port = D4
+#define SHT21_SENSOR           // use SHT21
+#define BMP_SENSOR             // use BMP085 or BMP180
+#define DHT_SENSOR             // DHT11 or DHT22
+
+
+#define LED_ON                 // use act led for transmission
+
+#define DEBUG                  // debug mode - serial output
+
 /*************************************************************/
-/********************DON'T EDIT COD BELOW*********************/
+
+#ifdef DS18B20
+  #define DS_COUNT          3  // http://www.hacktronics.com/Tutorials/arduino-1-wire-address-finder.html , http://forum.arduino.cc/index.php?topic=143382.0
+#endif
+
+#ifdef SHT21_SENSOR || BMP_SENSOR
+  #define I2C                  // use i2c bus for BMP085/BMP180 and SHT21
+#endif
+
+#ifdef DHT_SENSOR
+  #define DHTTYPE           DHT22
+  #define DHTPIN            4  // port P1 = digital 4
+#endif
+
+
 /*************************************************************/
 
 // Input/Output definition
 // Analog
-#if NEW_REV //3.4
+#ifdef NEW_REV //3.4
   #define LDR               2
   #define BAT_VOL           3
 #else //3.0
@@ -67,7 +79,7 @@ TODO:
 #endif
 
 // Digital
-#if NEW_REV //3.4
+#ifdef NEW_REV //3.4
   #define MOSFET            7
   #define ONEWIRE_DATA      8
   #define ACT_LED           9
@@ -93,68 +105,70 @@ typedef struct {
 } Payload;
 Payload measure;
 
-volatile bool adcDone;
-
-ISR(ADC_vect) { adcDone = true; }
 ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 
-#if NEW_REV
-  // Port p1 (1); // JeeLabs Port P1
-  // Port p2 (2); // JeeLabs Port P2
+#ifdef NEW_REV
+  //Port p1 (1); // JeeLabs Port P1
+  Port p2 (2); // JeeLabs Port P2
   Port ldr (3);  // Analog pin 2
   Port batvol (4); // Analog pin 3
 #endif
 
 byte count = 0;
+int tempReading;
 
-#if DS18B20
-  OneWire oneWire(ONEWIRE_DATA);
-  DallasTemperature sensors(&oneWire);
+#ifdef DS18B20
+    OneWire oneWire(ONEWIRE_DATA);
+    DallasTemperature sensors(&oneWire);
 #endif
 
-#if DHT11
-  dht11 DHT;
+#ifdef DHT_SENSOR
+  DHT dht(DHTPIN, DHTTYPE);
 #endif
 
-void setup() {
-  #if DEBUG
-      Serial.begin(9600);
-  #endif
- 
-  
-  rf12_initialize(myNodeID, band, network);
-  rf12_control(0xC040); // 2.2v low
-  #if LOWRATE
-    rf12_control(0xC623); // ~9.6kbps
-  #endif
+void setup()
+{
+    rf12_initialize(NODEID, RF12_433MHZ, NETWORK);
+    rf12_control(0xC040); // 2.2v low
 
-  #if I2C
+#ifdef DHT_SENSOR
+  dht.begin();
+#endif
+
+#ifdef I2C
     Wire.begin();
-  #endif
-        
-/*
-  #if ONEWIRE
-      sensors.begin();
-  #endif
-*/
+#endif
+
+#ifdef DEBUG
+    Serial.begin(115200);
+#endif
+
+#if ONEWIRE
+    sensors.begin();
+#endif
+
 }
-static void sendPayload()
+
+void loop()
 {
   doMeasure(); // mierz
-
-  #if DEBUG
+  #ifdef DEBUG
      transmissionRS();
   #endif
-  #if LED_ON
+  #ifdef LED_ON
     activityLed(1);
   #endif
   doReport(); // wyslij
-  #if LED_ON
+  #ifdef LED_ON
     activityLed(0);
   #endif
+
+  for (byte t = 0; t < PERIOD; t++)  // spij
+    Sleepy::loseSomeTime(60000);
 }
 
-static void doReport() {
+static void doReport()
+{
   rf12_sleep(RF12_SLEEP);
   while (!rf12_canSend())
     rf12_recvDone();
@@ -163,22 +177,8 @@ static void doReport() {
   rf12_sleep(RF12_SLEEP);
 }
 
-static byte vccRead (byte count =4) {
-  set_sleep_mode(SLEEP_MODE_ADC);
-  ADMUX = bit(REFS0) | 14; // use VCC and internal bandgap
-  bitSet(ADCSRA, ADIE);
-  while (count-- > 0) {
-    adcDone = false;
-    while (!adcDone)
-      sleep_mode();
-  }
-  bitClear(ADCSRA, ADIE);
-  // convert ADC readings to fit in one byte, i.e. 20 mV steps:
-  //  1.0V = 0, 1.8V = 40, 3.3V = 115, 5.0V = 200, 6.0V = 250
-  return (55U * 1023U) / (ADC + 1) - 50;
-}
-
-static void transmissionRS() {
+static void transmissionRS()
+{
   activityLed(1);
   Serial.println(' ');
   Serial.print("LIGHT ");
@@ -187,14 +187,16 @@ static void transmissionRS() {
   Serial.println(measure.humi);
   Serial.print("TEMP ");
   Serial.println(measure.temp);
-  Serial.print("PRESS ");
+  Serial.print("PRES ");
   Serial.println(measure.pressure);
   Serial.print("LOBAT " );
   Serial.println(measure.lobat, DEC);
   Serial.print("BATVOL ");
   Serial.println(measure.battvol);
+  /*
   Serial.print("VCCREF ");
-  Serial.println(vccRead());
+  Serial.println(readVcc());
+  */
   activityLed(0);
 }
 
@@ -203,24 +205,32 @@ static void activityLed (byte on) {
   digitalWrite(ACT_LED, on);
   delay(150);
 }
-
+/*
+ long readVcc() {
+   long result;
+   // Read 1.1V reference against Vcc
+   ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+   delay(2); // Wait for Vref to settle
+   ADCSRA |= _BV(ADSC); // Convert
+   while (bit_is_set(ADCSRA,ADSC));
+   result = ADCL;
+   result |= ADCH<<8;
+   result = 1126400L / result; // Back-calculate Vcc in mV
+   return result;
+   ADCSRA &= ~ bit(ADEN); bitSet(PRR, PRADC); // Disable the ADC to save power
+}
+*/
 static void doMeasure() {
   count++;
-  int tempReading = 0;
+  tempReading = 0;
 
-  //Serial.print(".");
-  measure.lobat = rf12_lowbat();
-
-#if NEW_REV
+#ifdef NEW_REV
   for (byte t = 0;t < 3; t++) {
     tempReading += batvol.anaRead();
     Sleepy::loseSomeTime(50);
   }
   tempReading = tempReading / 3;
   measure.battvol = map(tempReading,0,1023,0,6600);
-  #if LDR
-    measure.light = map(ldr.anaRead(),0,1023,100,0);
-  #endif
 #else
   for (byte t = 0;t < 3; t++) {
     tempReading += analogRead(BAT_VOL);
@@ -228,25 +238,27 @@ static void doMeasure() {
   }
   tempReading = tempReading / 3;
   measure.battvol = map(tempReading,0,1023,0,6600);
-  #if LDR
-    measure.light = map(analogRead(LDR),0,1023,100,0);
-  #endif
 #endif
 
-#if DHT11
-  DHT.read(DHT11PIN);
-  float h = DHT.humidity;
-  float t = DHT.temperature;
-  if (isnan(t) || isnan(h)) {
-    return;
+//  measure.battvol = readVcc();
+  Serial.print(".");
+  //measure.nodeid = NODEID;
+  measure.lobat = rf12_lowbat();
+
+#ifdef LDR
+  if ((count % 2) == 0) {
+     measure.light = ldr.anaRead();
   }
-  else {
-    measure.temp = t*10;
-    measure.humi = h*10;
-  }
+  /*
+    def get_light_level(self):
+    result = self.adc.readADC(self.adcPin) + 1
+    vout = float(result)/1023 * 3.3
+    rs = ((3.3 - vout) / vout) * 5.6
+    return abs(rs)
+    */
 #endif
 
-#if I2C
+#ifdef I2C
   float shthumi = SHT2x.GetHumidity();
   float shttemp = SHT2x.GetTemperature();
   measure.humi = shthumi * 10;
@@ -257,36 +269,24 @@ static void doMeasure() {
   measure.pressure = (BMP085.press*10*10) + 16;
 #endif
 
-#if DS18B20
+#ifdef DS18B20
   sensors.requestTemperatures();
   Sleepy::loseSomeTime(750);
   float tmp = sensors.getTempCByIndex(0);
   measure.temp = tmp * 10;
-#endif  
+#endif
+
+#ifdef DHT_SENSOR
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();
+  if (isnan(h) || isnan(t)) {
+    Serial.println("Failed to read from DHT sensor!");
+    return;
+  }
+  else {
+    measure.humi = h*10;
+    measure.temp = t*10;
+  }
+#endif
 }
 
-// https://github.com/jcw/jeelib/blob/master/examples/RF12/radioBlip2/radioBlip2.ino
-#define VCC_OK    85  // >= 2.7V - enough power for normal 1-minute sends
-#define VCC_LOW   80  // >= 2.6V - sleep for 1 minute, then try again
-#define VCC_DOZE  75  // >= 2.5V - sleep for 5 minutes, then try again
-                      //  < 2.5V - sleep for 60 minutes, then try again
-#define VCC_SLEEP_MINS(x) ((x) >= VCC_LOW ? 1 : (x) >= VCC_DOZE ? 5 : 60)
-
-#define VCC_FINAL 70  // <= 2.4V - send anyway, might be our last swan song
-
-void loop() {
-  byte vcc = vccRead();
-
-  if (vcc <= VCC_FINAL) { // hopeless, maybe we can get one last packet out
-    sendPayload();
-    vcc = 1; // don't even try reading VCC after this send
-  }
-
-  if (vcc >= VCC_OK) { // enough energy for normal operation
-    sendPayload();
-  }
-
-  byte minutes = VCC_SLEEP_MINS(vcc);
-  while (minutes-- > 0)
-    Sleepy::loseSomeTime(60000);
-}
