@@ -154,19 +154,19 @@ void setup()
 
 void loop()
 {
-  doMeasure(); // mierz
+  doMeasure(); // measure
   #ifdef DEBUG
      transmissionRS();
   #endif
   #ifdef LED_ON
     activityLed(1);
   #endif
-  doReport(); // wyslij
+  doReport(); // send
   #ifdef LED_ON
     activityLed(0);
   #endif
 
-  for (byte t = 0; t < PERIOD; t++)  // spij
+  for (byte t = 0; t < PERIOD; t++)  // send
     Sleepy::loseSomeTime(60000);
 }
 
