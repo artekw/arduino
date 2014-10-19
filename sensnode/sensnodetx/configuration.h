@@ -15,6 +15,8 @@
 // Used devices (comment on uncomment if not used)
 #define LDR                    // use LDR sensor
 #define DS18B20                // use 1WIE DS18B20
+#define MULTIPLE_DS            // multiple DS18B20 sensors, comment if use only one)
+#define DS_IDS             {0x00, 0x01, 0x02}
 
 #define SHT21_SENSOR           // use SHT21
 #define BMP_SENSOR             // use BMP085 or BMP180
