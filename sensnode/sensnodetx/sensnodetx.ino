@@ -36,7 +36,7 @@ TODO:
 #define PERIOD              1   // minutes
 #define RADIO_SYNC_MODE     2   // http://jeelabs.net/pub/docs/jeelib/RF12_8h.html#a6843bbc70df373dbffa0b3d1f33ef0ae
 
-// Used devices or buses (comment on uncommentif not used)
+// Used devices (comment on uncomment if not used)
 #define LDR                    // use LDR sensor
 #define DS18B20                // use 1WIE DS18B20
 
@@ -64,6 +64,9 @@ TODO:
   #define DHTPIN            4  // port P1 = digital 4
 #endif
 
+#ifndef NEW_REV
+  #undef LDR                  // disable LDR on old hardware 3.0
+#endif
 
 /*************************************************************/
 
