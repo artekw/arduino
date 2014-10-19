@@ -19,6 +19,8 @@
 #define SHT21_SENSOR           // use SHT21
 #define BMP_SENSOR             // use BMP085 or BMP180
 #define DHT_SENSOR             // DHT11 or DHT22
+#define DHT_SENSOR_TYPE    DHT22
+#define DHT_SENSOR_PORT    P1  // TODO!!
 
 //*********** OTHER ******************
 #define LED_ON                 // use act led for transmission

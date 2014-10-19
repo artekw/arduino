@@ -37,7 +37,7 @@ TODO:
 #endif
 
 #ifdef DHT_SENSOR
-  #define DHTTYPE           DHT22
+  #define DHTTYPE           DHT_SENSOR_TYPE
   #define DHTPIN            4  // port P1 = digital 4
 #endif
 
