@@ -42,7 +42,7 @@ TODO:
 #endif
 
 #ifndef NEW_REV
-  #undef LDR                  // disable LDR on old hardware 3.0
+  #undef LDR                   // disable LDR on old hardware 3.0
 #endif
 
 /*************************************************************/
@@ -73,7 +73,7 @@ TODO:
 
 /************************************************************/
 
-// structure of received data
+// structure of sended data
 
 typedef struct {
   int light;
