@@ -134,7 +134,7 @@ void setup()
 
 }
 
-void loop()
+static void sendPayload()
 {
   doMeasure(); // measure
   #ifdef DEBUG
