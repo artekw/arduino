@@ -13,7 +13,7 @@
 #define RADIO_SYNC_MODE     2   // http://jeelabs.net/pub/docs/jeelib/RF12_8h.html#a6843bbc70df373dbffa0b3d1f33ef0ae
 
 //*********** SENSORS ******************
-// Used devices (comment on uncomment if not used)
+// Used devices (comment or uncomment if not used)
 #define LDR                    // use LDR sensor
 #define DS18B20                // use 1WIE DS18B20
 #define MULTIPLE_DS            // multiple DS18B20 sensors, comment if use only one)
