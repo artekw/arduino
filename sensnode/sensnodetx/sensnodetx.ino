@@ -45,6 +45,9 @@ TODO:
   #undef LDR                   // disable LDR on old hardware 3.0
 #endif
 
+#ifndef DEBUG_BAUD
+  #define DEBUG_BAUD        9600
+#endif
 /*************************************************************/
 
 // Input/Output definition
@@ -131,7 +134,7 @@ void setup()
 #endif
 
 #ifdef DEBUG
-    Serial.begin(115200);
+    Serial.begin(DEBUG_BAUD);
 #endif
 
 #if ONEWIRE

@@ -28,6 +28,7 @@
 //*********** OTHER ******************
 #define LED_ON                 // use act led for transmission
 
-//#define DEBUG                  // debug mode - serial output
+#define DEBUG                  // debug mode - serial output
+//#define DEBUG_BAUD      115200  // if not define baud rate = 9600bps
 
 #endif //__CONFIGURATION_H
