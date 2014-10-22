@@ -78,11 +78,12 @@ TODO:
 typedef struct {
   int light;
   int humi;
-  #if DS_COUNT >= 1
+  #ifndef MULTIPLE_DS
     int temp;
   #else
+  //for (i=0;i>0;i++) {
+  // int tempDSi
   #endif
-  
   int pressure;
   byte lobat      :1;
   int battvol;
@@ -161,6 +162,21 @@ static void doReport()
   rf12_sleep(RF12_SLEEP);
 }
 
+static byte vccRead (byte count =4) {
+  set_sleep_mode(SLEEP_MODE_ADC);
+  ADMUX = bit(REFS0) | 14; // use VCC and internal bandgap
+  bitSet(ADCSRA, ADIE);
+  while (count-- > 0) {
+    adcDone = false;
+    while (!adcDone)
+      sleep_mode();
+  }
+  bitClear(ADCSRA, ADIE);
+  // convert ADC readings to fit in one byte, i.e. 20 mV steps:
+  //  1.0V = 0, 1.8V = 40, 3.3V = 115, 5.0V = 200, 6.0V = 250
+  return (55U * 1023U) / (ADC + 1) - 50;
+}
+
 static void transmissionRS()
 {
   activityLed(1);
@@ -177,10 +193,8 @@ static void transmissionRS()
   Serial.println(measure.lobat, DEC);
   Serial.print("BATVOL ");
   Serial.println(measure.battvol);
-  /*
   Serial.print("VCCREF ");
   Serial.println(readVcc());
-  */
   activityLed(0);
 }
 
@@ -189,21 +203,7 @@ static void activityLed (byte on) {
   digitalWrite(ACT_LED, on);
   delay(150);
 }
-/*
- long readVcc() {
-   long result;
-   // Read 1.1V reference against Vcc
-   ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
-   delay(2); // Wait for Vref to settle
-   ADCSRA |= _BV(ADSC); // Convert
-   while (bit_is_set(ADCSRA,ADSC));
-   result = ADCL;
-   result |= ADCH<<8;
-   result = 1126400L / result; // Back-calculate Vcc in mV
-   return result;
-   ADCSRA &= ~ bit(ADEN); bitSet(PRR, PRADC); // Disable the ADC to save power
-}
-*/
+
 static void doMeasure() {
   count++;
   tempReading = 0;
@@ -224,7 +224,6 @@ static void doMeasure() {
   measure.battvol = map(tempReading,0,1023,0,6600);
 #endif
 
-//  measure.battvol = readVcc();
   Serial.print(".");
   //measure.nodeid = NODEID;
   measure.lobat = rf12_lowbat();
@@ -233,13 +232,6 @@ static void doMeasure() {
   if ((count % 2) == 0) {
      measure.light = ldr.anaRead();
   }
-  /*
-    def get_light_level(self):
-    result = self.adc.readADC(self.adcPin) + 1
-    vout = float(result)/1023 * 3.3
-    rs = ((3.3 - vout) / vout) * 5.6
-    return abs(rs)
-    */
 #endif
 
 #ifdef I2C
@@ -271,5 +263,35 @@ static void doMeasure() {
     measure.temp = t*10;
   }
 #endif
+}
+
+// https://github.com/jcw/jeelib/blob/master/examples/RF12/radioBlip2/radioBlip2.ino
+#define VCC_OK    85  // >= 2.7V - enough power for normal 1-minute sends
+#define VCC_LOW   80  // >= 2.6V - sleep for 1 minute, then try again
+#define VCC_DOZE  75  // >= 2.5V - sleep for 5 minutes, then try again
+                      //  < 2.5V - sleep for 60 minutes, then try again
+#define VCC_SLEEP_MINS(x) ((x) >= VCC_LOW ? 1 : (x) >= VCC_DOZE ? 5 : 60)
+
+#define VCC_FINAL 70  // <= 2.4V - send anyway, might be our last swan song
+
+void loop() {
+  byte vcc = vccRead();
+
+  if (vcc <= VCC_FINAL) { // hopeless, maybe we can get one last packet out
+    sendPayload();
+    vcc = 1; // don't even try reading VCC after this send
+  }
+
+  if (vcc >= VCC_OK) { // enough energy for normal operation
+    sendPayload();
+  }
+
+/* OLD
+  for (byte t = 0; t < PERIOD; t++)  // spij
+    Sleepy::loseSomeTime(60000);
+*/
+  byte minutes = VCC_SLEEP_MINS(vcc);
+  while (minutes-- > 0)
+    Sleepy::loseSomeTime(60000);
 }
 
