@@ -78,22 +78,25 @@ TODO:
 typedef struct {
   int light;
   int humi;
-  #ifndef MULTIPLE_DS
+  //#ifndef MULTIPLE_DS
     int temp;
-  #else
+  //#else
   //for (i=0;i>0;i++) {
   // int tempDSi
-  #endif
+  //#endif
   int pressure;
   byte lobat      :1;
   int battvol;
 } Payload;
 Payload measure;
 
+volatile bool adcDone;
+
+ISR(ADC_vect) { adcDone = true; }
 ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 
 #ifdef NEW_REV
-  //Port p1 (1); // JeeLabs Port P1
+  Port p1 (1); // JeeLabs Port P1
   Port p2 (2); // JeeLabs Port P2
   Port ldr (3);  // Analog pin 2
   Port batvol (4); // Analog pin 3
@@ -115,6 +118,9 @@ void setup()
 {
     rf12_initialize(NODEID, RF12_433MHZ, NETWORK);
     rf12_control(0xC040); // 2.2v low
+    #if LOWRATE
+      rf12_control(0xC623); // ~9.6kbps
+    #endif
 
 #ifdef DHT_SENSOR
   dht.begin();
@@ -185,8 +191,12 @@ static void transmissionRS()
   Serial.println(measure.light);
   Serial.print("HUMI ");
   Serial.println(measure.humi);
-  Serial.print("TEMP ");
-  Serial.println(measure.temp);
+  #ifndef MULTIPLE_DS
+    Serial.print("TEMP ");
+    Serial.println(measure.temp);
+  #else
+  //TODO
+  #endif
   Serial.print("PRES ");
   Serial.println(measure.pressure);
   Serial.print("LOBAT " );
@@ -194,7 +204,7 @@ static void transmissionRS()
   Serial.print("BATVOL ");
   Serial.println(measure.battvol);
   Serial.print("VCCREF ");
-  Serial.println(readVcc());
+  Serial.println(vccRead());
   activityLed(0);
 }
 

@@ -5,6 +5,7 @@
 #define NODEID              15  // (from 1 to 30)
 #define NETWORK             210
 #define NEW_REV                 // comment for old revision  (3.0 or 3.4)
+// #define LOWRATE  
 
 //*********** SETTINGS ******************
 //#define SMOOTH            3   // smoothing factor used for running averages
