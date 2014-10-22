@@ -78,7 +78,11 @@ TODO:
 typedef struct {
   int light;
   int humi;
-  int temp;
+  #if DS_COUNT >= 1
+    int temp;
+  #else
+  #endif
+  
   int pressure;
   byte lobat      :1;
   int battvol;
