@@ -4,7 +4,7 @@ Written by Artur Wronowski <artur.wronowski@digi-led.pl>
 Need Arduino 1.0 to compile
 
 TODO:
-- pomiar napiecia bateri, skalowanie czasu pomiedzy pomiarami w zaleznosci od panujacego napiecia
+- pomiar napiecia baterii, skalowanie czasu pomiedzy pomiarami w zaleznosci od panujacego napiecia
 - srednia z pomiarow
 - wiartomierz //#define ObwAnem 0.25434 // meters
 - http://hacking.majenko.co.uk/node/57
@@ -28,9 +28,7 @@ TODO:
 
 /*************************************************************/
 
-#ifdef DS18B20
-  #define DS_COUNT          3  // http://www.hacktronics.com/Tutorials/arduino-1-wire-address-finder.html , http://forum.arduino.cc/index.php?topic=143382.0
-#endif
+byte ds_array[DS_COUNT];
 
 #ifdef SHT21_SENSOR || BMP_SENSOR
   #define I2C                  // use i2c bus for BMP085/BMP180 and SHT21
@@ -41,8 +39,14 @@ TODO:
   #define DHTPIN            4  // port P1 = digital 4
 #endif
 
-#ifndef NEW_REV
-  #undef LDR                   // disable LDR on old hardware 3.0
+//#ifdef LDR
+//  #ifndef NEW_REV
+//    #undef LDR                   // disable LDR on old hardware 3.0
+//  #endif
+//#endif
+
+#ifdef DEV_MODE
+  #define DEBUG
 #endif
 
 #ifndef DEBUG_BAUD
@@ -81,12 +85,13 @@ TODO:
 typedef struct {
   int light;
   int humi;
-  //#ifndef MULTIPLE_DS
+  #if DS_COUNT > 1  // TODO
+    int temp0;
+    int temp1;
+    int temp2;
+  #else
     int temp;
-  //#else
-  //for (i=0;i>0;i++) {
-  // int tempDSi
-  //#endif
+  #endif
   int pressure;
   byte lobat      :1;
   int battvol;
@@ -107,10 +112,13 @@ ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 
 byte count = 0;
 int tempReading;
+int numberOfDevices;
 
 #ifdef DS18B20
+    #define TEMPERATURE_PRECISION 9
     OneWire oneWire(ONEWIRE_DATA);
     DallasTemperature sensors(&oneWire);
+    DeviceAddress tempDeviceAddress; // We'll use this variable to store a found device address
 #endif
 
 #ifdef DHT_SENSOR
@@ -137,8 +145,9 @@ void setup()
     Serial.begin(DEBUG_BAUD);
 #endif
 
-#if ONEWIRE
+#ifdef DS18B20
     sensors.begin();
+    numberOfDevices = sensors.getDeviceCount();
 #endif
 
 }
@@ -152,13 +161,12 @@ static void sendPayload()
   #ifdef LED_ON
     activityLed(1);
   #endif
-  doReport(); // send
+  #ifndef DEV_MODE
+    doReport(); // send
+  #endif
   #ifdef LED_ON
     activityLed(0);
   #endif
-
-  for (byte t = 0; t < PERIOD; t++)  // send
-    Sleepy::loseSomeTime(60000);
 }
 
 static void doReport()
@@ -188,26 +196,44 @@ static byte vccRead (byte count =4) {
 
 static void transmissionRS()
 {
+  #ifdef DEV_MODE
+    Serial.println("==DEV MODE==");
+    delay(2);
+  #endif
   activityLed(1);
   Serial.println(' ');
+  delay(2);
   Serial.print("LIGHT ");
   Serial.println(measure.light);
+  delay(2);
   Serial.print("HUMI ");
   Serial.println(measure.humi);
-  #ifndef MULTIPLE_DS
+  delay(2);
+  #if DS_COUNT > 1
+  for (byte i=0; i < DS_COUNT; i++) { 
+    Serial.print("TEMP");
+    Serial.print(i);
+    Serial.print(" ");
+    Serial.println(ds_array[i]);
+  }
+  #else
     Serial.print("TEMP ");
     Serial.println(measure.temp);
-  #else
-  //TODO
   #endif
   Serial.print("PRES ");
   Serial.println(measure.pressure);
+  delay(2);
   Serial.print("LOBAT " );
   Serial.println(measure.lobat, DEC);
+  delay(2);
   Serial.print("BATVOL ");
   Serial.println(measure.battvol);
-  Serial.print("VCCREF ");
-  Serial.println(vccRead());
+  delay(2);
+  //Serial.print("VCCREF ");
+  //Serial.println(vccRead());
+  //delay(2);
+  Serial.println(' ');
+  delay(2);
   activityLed(0);
 }
 
@@ -237,8 +263,6 @@ static void doMeasure() {
   measure.battvol = map(tempReading,0,1023,0,6600);
 #endif
 
-  Serial.print(".");
-  //measure.nodeid = NODEID;
   measure.lobat = rf12_lowbat();
 
 #ifdef LDR
@@ -249,9 +273,13 @@ static void doMeasure() {
 
 #ifdef I2C
   float shthumi = SHT2x.GetHumidity();
-  float shttemp = SHT2x.GetTemperature();
+  #ifndef DS18B20
+    float shttemp = SHT2x.GetTemperature();
+  #endif
   measure.humi = shthumi * 10;
-  measure.temp = shttemp * 10;
+  #ifndef DS18B20
+    measure.temp = shttemp * 10;
+  #endif
   Sleepy::loseSomeTime(250);
   BMP085.getCalData();
   BMP085.readSensor();
@@ -259,22 +287,42 @@ static void doMeasure() {
 #endif
 
 #ifdef DS18B20
+  #ifdef DEBUG
+    Serial.print("DS18B20 found: ");
+    Serial.println(numberOfDevices, DEC);
+  #endif
   sensors.requestTemperatures();
-  Sleepy::loseSomeTime(750);
-  float tmp = sensors.getTempCByIndex(0);
-  measure.temp = tmp * 10;
+  #if DS_COUNT > 1  // TODO
+    for(byte i=0; i < DS_COUNT; i++) {
+      Sleepy::loseSomeTime(750);
+      ds_array[i] = sensors.getTempCByIndex(i) * 10;
+    }
+    measure.temp0 = ds_array[0];
+    measure.temp1 = ds_array[1];
+    measure.temp2 = ds_array[2];
+  #else
+    Sleepy::loseSomeTime(750);
+    float tmp = sensors.getTempCByIndex(0);
+    measure.temp = tmp * 10;
+  #endif
 #endif
 
 #ifdef DHT_SENSOR
-  float h = dht.readHumidity();
-  float t = dht.readTemperature();
-  if (isnan(h) || isnan(t)) {
-    return;
-  }
-  else {
-    measure.humi = h*10;
-    measure.temp = t*10;
-  }
+ #ifndef SHT21
+   float h = dht.readHumidity();
+   #ifndef DS18B20
+     float t = dht.readTemperature();
+   #endif
+   if (isnan(h) || isnan(t)) {
+     return;
+   } 
+   else {
+     measure.humi = h*10;
+     #ifndef DS18B20
+       measure.temp = t*10;
+     #endif
+   }
+  #endif
 #endif
 }
 
@@ -291,11 +339,19 @@ void loop() {
   byte vcc = vccRead();
 
   if (vcc <= VCC_FINAL) { // hopeless, maybe we can get one last packet out
+    #ifdef DEBUG
+      Serial.println("Battery: LOW");
+      delay(2);
+    #endif
     sendPayload();
     vcc = 1; // don't even try reading VCC after this send
   }
 
   if (vcc >= VCC_OK) { // enough energy for normal operation
+    #ifdef DEBUG
+      Serial.println("Battery: OK");
+      delay(2);
+    #endif
     sendPayload();
   }
 
@@ -305,6 +361,10 @@ void loop() {
 */
   byte minutes = VCC_SLEEP_MINS(vcc);
   while (minutes-- > 0)
-    Sleepy::loseSomeTime(60000);
+    #ifndef DEV_MODE
+      Sleepy::loseSomeTime(60000);
+    #else
+      Sleepy::loseSomeTime(6000);
+    #endif
 }
 
