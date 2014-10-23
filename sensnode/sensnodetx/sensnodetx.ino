@@ -28,7 +28,7 @@ TODO:
 
 /*************************************************************/
 
-byte ds_array[DS_COUNT];
+int ds_array[DS_COUNT];
 
 #ifdef SHT21_SENSOR || BMP_SENSOR
   #define I2C                  // use i2c bus for BMP085/BMP180 and SHT21
@@ -291,16 +291,19 @@ static void doMeasure() {
     Serial.print("DS18B20 found: ");
     Serial.println(numberOfDevices, DEC);
   #endif
-  sensors.requestTemperatures();
+
   #if DS_COUNT > 1  // TODO
     for(byte i=0; i < DS_COUNT; i++) {
+      sensors.requestTemperatures();
       Sleepy::loseSomeTime(750);
-      ds_array[i] = sensors.getTempCByIndex(i) * 10;
+      float tmp = sensors.getTempCByIndex(i);
+      ds_array[i] = tmp * 10;
     }
     measure.temp0 = ds_array[0];
     measure.temp1 = ds_array[1];
     measure.temp2 = ds_array[2];
   #else
+    sensors.requestTemperatures();
     Sleepy::loseSomeTime(750);
     float tmp = sensors.getTempCByIndex(0);
     measure.temp = tmp * 10;

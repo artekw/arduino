@@ -14,7 +14,7 @@
 // Used devices (comment or uncomment if not used)
 //#define LDR                    // use LDR sensor
 #define DS18B20                // use 1WIE DS18B20
-#define DS_COUNT           1   // TO FIX; NOW ONLY 1 or 3 sensors
+#define DS_COUNT           3   // TO FIX; NOW ONLY 1 or 3 sensors
 
 //#define SHT21_SENSOR           // use SHT21
 //#define BMP_SENSOR             // use BMP085 or BMP180
@@ -25,8 +25,8 @@
 //*********** OTHER ******************
 #define LED_ON                 // use act led for transmission
 
-//#define DEV_MODE               // display output only on console, do not send packages via radio
-//#define DEBUG                  // debug mode - serial output
+#define DEV_MODE               // display output only on console, do not send packages via radio
+#define DEBUG                  // debug mode - serial output
 #define DEBUG_BAUD      57600  // if not define baud rate = 9600bps
 
 #endif //__CONFIGURATION_H
