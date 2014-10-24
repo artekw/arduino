@@ -36,7 +36,7 @@ int ds_array[DS_COUNT];
 //  #define I2C                  // use i2c bus for BMP085/BMP180 and SHT21
 //#endif //changed beckause of BMP
 
-int ds_array[DS_COUNT];
+
 #ifdef DHT_SENSOR
 float h; // define humidity DTH variable
 float t; //define temperature DTH variable
