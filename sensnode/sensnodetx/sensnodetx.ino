@@ -280,7 +280,7 @@ static void doMeasure() {
 
   measure.lobat = rf12_lowbat();
 
-#ifdef LDR
+#define LDR_SENSOR // use LDR sensor
   if ((count % 2) == 0) {
      measure.light = ldr.anaRead();
   }
