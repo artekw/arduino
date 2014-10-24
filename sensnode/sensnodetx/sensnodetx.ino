@@ -28,11 +28,26 @@ TODO:
 
 /*************************************************************/
 
+//int ds_array[DS_COUNT];
+#ifdef DS18B20
 int ds_array[DS_COUNT];
-
-#ifdef SHT21_SENSOR || BMP_SENSOR
-  #define I2C                  // use i2c bus for BMP085/BMP180 and SHT21
 #endif
+//#ifdef SHT21_SENSOR || BMP_SENSOR //changed beckause of BMP
+//  #define I2C                  // use i2c bus for BMP085/BMP180 and SHT21
+//#endif //changed beckause of BMP
+
+
+#ifdef DHT_SENSOR
+float h; // define humidity DTH variable
+float t; //define temperature DTH variable
+#endif
+#ifdef SHT21_SENSOR
+  #define I2C
+#else
+ #ifdef BMP_SENSOR
+ #define I2C
+ #endif
+ #endif
 
 #ifdef DHT_SENSOR
   #define DHTTYPE           DHT_SENSOR_TYPE
@@ -127,7 +142,7 @@ int numberOfDevices;
 
 void setup()
 {
-    rf12_initialize(NODEID, RF12_433MHZ, NETWORK);
+    rf12_initialize(NODEID, BAND, NETWORK);
     rf12_control(0xC040); // 2.2v low
     #if LOWRATE
       rf12_control(0xC623); // ~9.6kbps
@@ -229,7 +244,7 @@ static void transmissionRS()
   Serial.print("BATVOL ");
   Serial.println(measure.battvol);
   delay(2);
-  //Serial.print("VCCREF ");
+  //Serial.print("VCCREF ");  // power control by 
   //Serial.println(vccRead());
   //delay(2);
   Serial.println(' ');
@@ -265,13 +280,14 @@ static void doMeasure() {
 
   measure.lobat = rf12_lowbat();
 
-#ifdef LDR
+#define LDR_SENSOR // use LDR sensor
   if ((count % 2) == 0) {
      measure.light = ldr.anaRead();
   }
 #endif
 
 #ifdef I2C
+ #ifdef SHT21_SENSOR
   float shthumi = SHT2x.GetHumidity();
   #ifndef DS18B20
     float shttemp = SHT2x.GetTemperature();
@@ -280,10 +296,18 @@ static void doMeasure() {
   #ifndef DS18B20
     measure.temp = shttemp * 10;
   #endif
-  Sleepy::loseSomeTime(250);
+
+#endif
+//  Sleepy::loseSomeTime(250);
+//  BMP085.getCalData();
+ // BMP085.readSensor();
+ // measure.pressure = ((BMP085.press*10*10) + 16);
+ #ifdef BMP_SENSOR 
+ Sleepy::loseSomeTime(250);
   BMP085.getCalData();
   BMP085.readSensor();
-  measure.pressure = (BMP085.press*10*10) + 16;
+  measure.pressure = ((BMP085.press*10*10) + 16);
+ #endif
 #endif
 
 #ifdef DS18B20
