@@ -13,7 +13,7 @@
 
 //*********** SENSORS ******************
 // Used devices (comment or uncomment if not used)
-//#define LDR                    // use LDR sensor
+#define LDR_SENSOR                    // use LDR sensor
 #define DS18B20                // use 1WIE DS18B20
 #define DS_COUNT           3   // TO FIX; NOW ONLY 1 or 3 sensors
 
