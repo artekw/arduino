@@ -5,7 +5,7 @@
 #define NODEID              1  // (from 1 to 30)
 #define NETWORK             210
 #define NEW_REV                 // comment for old revision  (3.0 or 3.4)
-#define BAND RF12_868MHZ // Band
+#define BAND                RF12_434MHZ // Band
 // #define LOWRATE  
 
 //*********** SETTINGS ******************

@@ -30,16 +30,12 @@ TODO:
 
 //int ds_array[DS_COUNT];
 #ifdef DS18B20
-int ds_array[DS_COUNT];
+  int ds_array[DS_COUNT];
 #endif
-//#ifdef SHT21_SENSOR || BMP_SENSOR //changed beckause of BMP
-//  #define I2C                  // use i2c bus for BMP085/BMP180 and SHT21
-//#endif //changed beckause of BMP
-
 
 #ifdef DHT_SENSOR
-float h; // define humidity DTH variable
-float t; //define temperature DTH variable
+  float h; // define humidity DTH variable
+  float t; //define temperature DTH variable
 #endif
 #ifdef SHT21_SENSOR
   #define I2C
@@ -133,7 +129,7 @@ int numberOfDevices;
     #define TEMPERATURE_PRECISION 9
     OneWire oneWire(ONEWIRE_DATA);
     DallasTemperature sensors(&oneWire);
-    DeviceAddress tempDeviceAddress; // We'll use this variable to store a found device address
+    DeviceAddress tempDeviceAddress;
 #endif
 
 #ifdef DHT_SENSOR
@@ -244,7 +240,7 @@ static void transmissionRS()
   Serial.print("BATVOL ");
   Serial.println(measure.battvol);
   delay(2);
-  //Serial.print("VCCREF ");  // power control by 
+  //Serial.print("VCCREF "); 
   //Serial.println(vccRead());
   //delay(2);
   Serial.println(' ');
@@ -280,7 +276,7 @@ static void doMeasure() {
 
   measure.lobat = rf12_lowbat();
 
-#define LDR_SENSOR // use LDR sensor
+#define LDR_SENSOR
   if ((count % 2) == 0) {
      measure.light = ldr.anaRead();
   }
@@ -298,12 +294,8 @@ static void doMeasure() {
   #endif
 
 #endif
-//  Sleepy::loseSomeTime(250);
-//  BMP085.getCalData();
- // BMP085.readSensor();
- // measure.pressure = ((BMP085.press*10*10) + 16);
  #ifdef BMP_SENSOR 
- Sleepy::loseSomeTime(250);
+  Sleepy::loseSomeTime(250);
   BMP085.getCalData();
   BMP085.readSensor();
   measure.pressure = ((BMP085.press*10*10) + 16);
