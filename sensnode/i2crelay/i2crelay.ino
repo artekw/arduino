@@ -22,14 +22,14 @@ void setup () {
     pinMode(9, OUTPUT);
 
     i2crelay_1.begin(relay_adress);
-    i2crelay_1.pinMode(0, OUTPUT); //rel1
-    i2crelay_1.pinMode(1, OUTPUT); //rel2
-    i2crelay_1.pinMode(2, OUTPUT); //rel3
+    i2crelay_1.pinMode(0, OUTPUT); //rel3
+    i2crelay_1.pinMode(1, OUTPUT); //rel1
+    i2crelay_1.pinMode(2, OUTPUT); //rel2
     i2crelay_1.pullUp(0); // ??
 }
 
 void loop () {
-    /* 12 02 1  |  NID CMD STATE */
+    /* 01 02 1  |  NID CMD STATE */
     if (rf12_recvDone() && rf12_crc == 0 && rf12_len == sizeof rxdata) {
 
         Serial.print("RX");
@@ -46,9 +46,35 @@ void loop () {
     }
 
     if (rxdata.destnode == thisNode) {
+      if (rxdata.cmd == 1) {
 
         /* process cmd */
-
+        switch (rxdata.state) {
+            case 0:
+                i2crelay_1.digitalWrite(1, HIGH);
+                break;
+            case 1:
+                i2crelay_1.digitalWrite(1, LOW);
+                break;
+            default:
+                i2crelay_1.digitalWrite(1, LOW);
+        }
+      }
+      else if (rxdata.cmd == 2) {
+                /* process cmd */
+        switch (rxdata.state) {
+            case 0:
+                i2crelay_1.digitalWrite(2, HIGH);
+                break;
+            case 1:
+                i2crelay_1.digitalWrite(2, LOW);
+                break;
+            default:
+                i2crelay_1.digitalWrite(2, LOW);
+        }
+    }
+    else {
+              /* process cmd */
         switch (rxdata.state) {
             case 0:
                 i2crelay_1.digitalWrite(0, HIGH);
@@ -60,16 +86,6 @@ void loop () {
                 i2crelay_1.digitalWrite(0, LOW);
         }
     }
-/*
-    if (sendTimer.poll(3000))
-        needToSend = 1;
-
-    if (needToSend && rf12_canSend()) {
-        needToSend = 0;
-
-        sendLed(1);
-        rf12_sendStart(0, payload, sizeof payload);
-        delay(100); // otherwise led blinking isn't visible
-        sendLed(0);
-    }*/
 }
+}
+
