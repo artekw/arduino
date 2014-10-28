@@ -28,7 +28,6 @@ TODO:
 
 /*************************************************************/
 
-//int ds_array[DS_COUNT];
 #ifdef DS18B20
   int ds_array[DS_COUNT];
 #endif
@@ -37,6 +36,7 @@ TODO:
   float h; // define humidity DTH variable
   float t; //define temperature DTH variable
 #endif
+
 #ifdef SHT21_SENSOR
   #define I2C
 #else
@@ -63,6 +63,7 @@ TODO:
 #ifndef DEBUG_BAUD
   #define DEBUG_BAUD        9600
 #endif
+
 /*************************************************************/
 
 // Input/Output definition
@@ -138,11 +139,16 @@ int numberOfDevices;
 
 void setup()
 {
-    rf12_initialize(NODEID, BAND, NETWORK);
-    rf12_control(0xC040); // 2.2v low
-    #if LOWRATE
-      rf12_control(0xC623); // ~9.6kbps
-    #endif
+  #if BAND == 433
+    rf12_initialize(NODEID, RF12_433MHZ, NETWORK);
+  #endif
+  #if BAND == 868
+    rf12_initialize(NODEID, RF12_868MHZ, NETWORK);
+  #endif
+  rf12_control(0xC040); // 2.2v low
+  #if LOWRATE
+    rf12_control(0xC623); // ~9.6kbps
+  #endif
 
 #ifdef DHT_SENSOR
   dht.begin();
@@ -280,7 +286,6 @@ static void doMeasure() {
   if ((count % 2) == 0) {
      measure.light = ldr.anaRead();
   }
-#endif
 
 #ifdef I2C
  #ifdef SHT21_SENSOR
