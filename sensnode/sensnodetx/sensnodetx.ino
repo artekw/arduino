@@ -4,7 +4,6 @@ Written by Artur Wronowski <artur.wronowski@digi-led.pl>
 Need Arduino 1.0 to compile
 
 TODO:
-- pomiar napiecia baterii, skalowanie czasu pomiedzy pomiarami w zaleznosci od panujacego napiecia
 - srednia z pomiarow
 - wiartomierz //#define ObwAnem 0.25434 // meters
 - http://hacking.majenko.co.uk/node/57
@@ -37,13 +36,9 @@ TODO:
   float t; //define temperature DTH variable
 #endif
 
-#ifdef SHT21_SENSOR
+#ifdef SHT21_SENSOR || BMP_SENSOR
   #define I2C
-#else
- #ifdef BMP_SENSOR
- #define I2C
- #endif
- #endif
+#endif
 
 #ifdef DHT_SENSOR
   #define DHTTYPE           DHT_SENSOR_TYPE
@@ -116,15 +111,16 @@ ISR(ADC_vect) { adcDone = true; }
 ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 
 #ifdef NEW_REV
-  Port p1 (1); // JeeLabs Port P1
-  Port p2 (2); // JeeLabs Port P2
-  Port ldr (3);  // Analog pin 2
-  Port batvol (4); // Analog pin 3
+  //Port p1 (1); // JeeLabs Port P1
+  //Port p2 (2); // JeeLabs Port P2
+  Port ldr (1);  // Analog pin 2  ????
+  Port batvol (2); // Analog pin 3
 #endif
 
 byte count = 0;
 int tempReading;
 int numberOfDevices;
+int volts;
 
 #ifdef DS18B20
     #define TEMPERATURE_PRECISION 9
@@ -169,6 +165,7 @@ void setup()
 
 }
 
+
 static void sendPayload()
 {
   doMeasure(); // measure
@@ -186,6 +183,7 @@ static void sendPayload()
   #endif
 }
 
+
 static void doReport()
 {
   rf12_sleep(RF12_SLEEP);
@@ -196,20 +194,37 @@ static void doReport()
   rf12_sleep(RF12_SLEEP);
 }
 
-static byte vccRead (byte count =4) {
-  set_sleep_mode(SLEEP_MODE_ADC);
-  ADMUX = bit(REFS0) | 14; // use VCC and internal bandgap
-  bitSet(ADCSRA, ADIE);
-  while (count-- > 0) {
-    adcDone = false;
-    while (!adcDone)
-      sleep_mode();
-  }
-  bitClear(ADCSRA, ADIE);
-  // convert ADC readings to fit in one byte, i.e. 20 mV steps:
-  //  1.0V = 0, 1.8V = 40, 3.3V = 115, 5.0V = 200, 6.0V = 250
-  return (55U * 1023U) / (ADC + 1) - 50;
+
+int vccRead(void) {
+  const long InternalReferenceVoltage = 1050L;  // Adust this value to your boards specific internal BG voltage x1000
+  ADMUX = (0<<REFS1) | (1<<REFS0) | (0<<ADLAR) | (1<<MUX3) | (1<<MUX2) | (1<<MUX1) | (0<<MUX0);      
+  // Start a conversion  
+  ADCSRA |= _BV( ADSC );
+  // Wait for it to complete
+  while( ( (ADCSRA & (1<<ADSC)) != 0 ) );
+  // Scale the value
+  int results = (((InternalReferenceVoltage * 1024L) / ADC) + 5L) / 10L;
+  return results;
 }
+
+
+int vccRef(void) {
+  for (int i=0; i <= 3; i++) volts=vccRead();
+  return volts;
+}
+
+
+int battVolts(void) {
+#ifdef NEW_REV
+  for (byte i=0; i <= 3; i++) tempReading=batvol.anaRead();
+  int battvol = map(tempReading,0,1023,0,6600);
+#else
+  for (byte i=0; i <= 3; i++) tempReading=analogRead(BAT_VOL);
+  int battvol = map(tempReading,0,1023,0,6600);
+#endif
+  return battvol;
+}
+
 
 static void transmissionRS()
 {
@@ -246,13 +261,14 @@ static void transmissionRS()
   Serial.print("BATVOL ");
   Serial.println(measure.battvol);
   delay(2);
-  //Serial.print("VCCREF "); 
-  //Serial.println(vccRead());
-  //delay(2);
+  Serial.print("VCCREF "); 
+  Serial.println(vccRef());
+  delay(2);
   Serial.println(' ');
   delay(2);
   activityLed(0);
 }
+
 
 static void activityLed (byte on) {
   pinMode(ACT_LED, OUTPUT);
@@ -260,28 +276,14 @@ static void activityLed (byte on) {
   delay(150);
 }
 
+
 static void doMeasure() {
   count++;
   tempReading = 0;
 
-#ifdef NEW_REV
-  for (byte t = 0;t < 3; t++) {
-    tempReading += batvol.anaRead();
-    Sleepy::loseSomeTime(50);
-  }
-  tempReading = tempReading / 3;
-  measure.battvol = map(tempReading,0,1023,0,6600);
-#else
-  for (byte t = 0;t < 3; t++) {
-    tempReading += analogRead(BAT_VOL);
-    Sleepy::loseSomeTime(50);
-  }
-  tempReading = tempReading / 3;
-  measure.battvol = map(tempReading,0,1023,0,6600);
-#endif
-
   measure.lobat = rf12_lowbat();
-
+  measure.battvol = battVolts();
+  
 #define LDR_SENSOR
   if ((count % 2) == 0) {
      measure.light = ldr.anaRead();
@@ -350,45 +352,27 @@ static void doMeasure() {
 #endif
 }
 
-// https://github.com/jcw/jeelib/blob/master/examples/RF12/radioBlip2/radioBlip2.ino
-#define VCC_OK    85  // >= 2.7V - enough power for normal 1-minute sends
-#define VCC_LOW   80  // >= 2.6V - sleep for 1 minute, then try again
-#define VCC_DOZE  75  // >= 2.5V - sleep for 5 minutes, then try again
-                      //  < 2.5V - sleep for 60 minutes, then try again
-#define VCC_SLEEP_MINS(x) ((x) >= VCC_LOW ? 1 : (x) >= VCC_DOZE ? 5 : 60)
 
-#define VCC_FINAL 70  // <= 2.4V - send anyway, might be our last swan song
-
+// Main loop
 void loop() {
-  byte vcc = vccRead();
-
-  if (vcc <= VCC_FINAL) { // hopeless, maybe we can get one last packet out
-    #ifdef DEBUG
-      Serial.println("Battery: LOW");
-      delay(2);
-    #endif
+  int vcc = battVolts();
+  
+  if (vcc <= VCC_FINAL) { // ostatni mozliwy pakiet
     sendPayload();
     vcc = 1; // don't even try reading VCC after this send
   }
 
-  if (vcc >= VCC_OK) { // enough energy for normal operation
-    #ifdef DEBUG
-      Serial.println("Battery: OK");
-      delay(2);
-    #endif
+  if (vcc >= VCC_OK) { // wszytko ok
     sendPayload();
   }
 
-/* OLD
-  for (byte t = 0; t < PERIOD; t++)  // spij
-    Sleepy::loseSomeTime(60000);
-*/
-  byte minutes = VCC_SLEEP_MINS(vcc);
+  int minutes = VCC_SLEEP_MINS(vcc);
   while (minutes-- > 0)
     #ifndef DEV_MODE
       Sleepy::loseSomeTime(60000);
     #else
       Sleepy::loseSomeTime(6000);
     #endif
+
 }
 
