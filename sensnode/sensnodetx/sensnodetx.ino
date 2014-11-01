@@ -181,9 +181,14 @@ long readVcc() {
 
 
 int battVolts(void) {
+  #if defined(__AVR_ATmega168__) 
+    analogReference(DEFAULT);
+  #else
+    analogReference(INTERNAL);
+  #endif
   double vccref = readVcc()/1000.0;
-  adcreading=analogRead(BAT_VOL) * 2;
-  double battvol = (tempReading / 1023.0) * vccref;
+  for(byte i = 0; i <= 3; i++) adcreading=analogRead(BAT_VOL) * 2;
+  double battvol = (adcreading / 1023.0) * vccref;
   return battvol * 1000;
 }
 
@@ -204,7 +209,7 @@ static void transmissionRS()
   activityLed(1);
   Serial.println(' ');
   delay(2);
-  #ifdef LDR
+  #ifdef LDR_SENSOR
     Serial.print("LIGHT ");
     Serial.println(measure.light);
     delay(2);

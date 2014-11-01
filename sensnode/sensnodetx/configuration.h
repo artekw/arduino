@@ -27,7 +27,7 @@
 //#define LED_ON                 // use act led for transmission
 
 //#define DEV_MODE               // display output only on console, do not send packages via radio
-#define DEBUG                  // debug mode - serial output
+//#define DEBUG                  // debug mode - serial output
 #define DEBUG_BAUD      57600  // if not define baud rate = 9600bps
 
 
