@@ -2,7 +2,7 @@
 #define CONFIGURATION_H
 
 //************ RADIO MODULE *************
-#define NODEID              1  // (1 to 30)
+#define NODEID              19  // (1 to 30)
 #define NETWORK             210
 #define NEW_REV                  // comment for old revision  (3.0 or 3.4)
 #define BAND                433  // (433 or 868)
@@ -14,17 +14,17 @@
 //*********** SENSORS ******************
 // Used devices (comment or uncomment if not used)
 //#define LDR_SENSOR                    // use LDR sensor
-#define DS18B20                // use 1WIE DS18B20
-#define DS_COUNT           3   // TO FIX; NOW ONLY 1 or 3 sensors
+//#define DS18B20                // use 1WIE DS18B20
+//#define DS_COUNT           3   // TO FIX; NOW ONLY 1 or 3 sensors
 
-//#define SHT21_SENSOR           // use SHT21
-//#define BMP_SENSOR             // use BMP085 or BMP180
+#define SHT21_SENSOR           // use SHT21
+#define BMP_SENSOR             // use BMP085 or BMP180
 //#define DHT_SENSOR             // DHT11 or DHT22
 #define DHT_SENSOR_TYPE    DHT22
 #define DHT_SENSOR_PORT    P1  // TODO!!
 
 //*********** OTHER ******************
-#define LED_ON                 // use act led for transmission
+//#define LED_ON                 // use act led for transmission
 
 //#define DEV_MODE               // display output only on console, do not send packages via radio
 #define DEBUG                  // debug mode - serial output

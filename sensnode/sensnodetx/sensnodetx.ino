@@ -34,22 +34,13 @@ TODO:
 #ifdef DHT_SENSOR
   float h; // define humidity DTH variable
   float t; //define temperature DTH variable
+  #define DHTTYPE           DHT_SENSOR_TYPE
+  #define DHTPIN            4  // port P1 = digital 4
 #endif
 
 #ifdef SHT21_SENSOR || BMP_SENSOR
   #define I2C
 #endif
-
-#ifdef DHT_SENSOR
-  #define DHTTYPE           DHT_SENSOR_TYPE
-  #define DHTPIN            4  // port P1 = digital 4
-#endif
-
-//#ifdef LDR
-//  #ifndef NEW_REV
-//    #undef LDR                   // disable LDR on old hardware 3.0
-//  #endif
-//#endif
 
 #ifdef DEV_MODE
   #define DEBUG
@@ -64,10 +55,10 @@ TODO:
 // Input/Output definition
 // Analog
 #ifdef NEW_REV //3.4
-  #define LDR               2
+  #define LDR_PIN           2
   #define BAT_VOL           3
 #else //3.0
-  #define LDR               0
+  #define LDR_PIN           0
   #define BAT_VOL           1
   #define CustomA3          3
 #endif
@@ -87,12 +78,18 @@ TODO:
 
 /************************************************************/
 
+byte count = 0;
+unsigned int adcreading;
+int numberOfDevices;
+int volts;
+
+
 // structure of sended data
 
 typedef struct {
   int light;
   int humi;
-  #if DS_COUNT > 1  // TODO
+  #ifdef DS18B20 && DS_COUNT > 1
     int temp0;
     int temp1;
     int temp2;
@@ -105,22 +102,13 @@ typedef struct {
 } Payload;
 Payload measure;
 
-volatile bool adcDone;
-
-ISR(ADC_vect) { adcDone = true; }
 ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 
 #ifdef NEW_REV
-  //Port p1 (1); // JeeLabs Port P1
-  //Port p2 (2); // JeeLabs Port P2
-  Port ldr (1);  // Analog pin 2  ????
-  Port batvol (2); // Analog pin 3
+  Port p1 (1); // JeeLabs Port P1
+  Port p2 (2); // JeeLabs Port P2
+  Port batvol (3);
 #endif
-
-byte count = 0;
-int tempReading;
-int numberOfDevices;
-int volts;
 
 #ifdef DS18B20
     #define TEMPERATURE_PRECISION 9
@@ -132,6 +120,7 @@ int volts;
 #ifdef DHT_SENSOR
   DHT dht(DHTPIN, DHTTYPE);
 #endif
+
 
 void setup()
 {
@@ -166,24 +155,6 @@ void setup()
 }
 
 
-static void sendPayload()
-{
-  doMeasure(); // measure
-  #ifdef DEBUG
-     transmissionRS();
-  #endif
-  #ifdef LED_ON
-    activityLed(1);
-  #endif
-  #ifndef DEV_MODE
-    doReport(); // send
-  #endif
-  #ifdef LED_ON
-    activityLed(0);
-  #endif
-}
-
-
 static void doReport()
 {
   rf12_sleep(RF12_SLEEP);
@@ -195,34 +166,32 @@ static void doReport()
 }
 
 
-int vccRead(void) {
-  const long InternalReferenceVoltage = 1050L;  // Adust this value to your boards specific internal BG voltage x1000
-  ADMUX = (0<<REFS1) | (1<<REFS0) | (0<<ADLAR) | (1<<MUX3) | (1<<MUX2) | (1<<MUX1) | (0<<MUX0);      
-  // Start a conversion  
-  ADCSRA |= _BV( ADSC );
-  // Wait for it to complete
-  while( ( (ADCSRA & (1<<ADSC)) != 0 ) );
-  // Scale the value
-  int results = (((InternalReferenceVoltage * 1024L) / ADC) + 5L) / 10L;
-  return results;
-}
-
-
-int vccRef(void) {
-  for (int i=0; i <= 3; i++) volts=vccRead();
-  return volts;
+long readVcc() {
+  long result;
+  // Read 1.1V reference against AVcc
+  ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+  delay(2);
+  ADCSRA |= _BV(ADSC);
+  while (bit_is_set(ADCSRA,ADSC));
+  result = ADCL;
+  result |= ADCH<<8;
+  result = 1125300L / result;
+  return result;
 }
 
 
 int battVolts(void) {
-#ifdef NEW_REV
-  for (byte i=0; i <= 3; i++) tempReading=batvol.anaRead();
-  int battvol = map(tempReading,0,1023,0,6600);
-#else
-  for (byte i=0; i <= 3; i++) tempReading=analogRead(BAT_VOL);
-  int battvol = map(tempReading,0,1023,0,6600);
-#endif
-  return battvol;
+  adcreading=analogRead(BAT_VOL) * 2;
+  double vccref = readVcc()/1000.0;
+  double battvol = (adcreading / 1023.0) * vccref;
+  return battvol * 1000;
+}
+
+
+static void activityLed (byte on) {
+  pinMode(ACT_LED, OUTPUT);
+  digitalWrite(ACT_LED, on);
+  delay(150);
 }
 
 
@@ -235,22 +204,29 @@ static void transmissionRS()
   activityLed(1);
   Serial.println(' ');
   delay(2);
-  Serial.print("LIGHT ");
-  Serial.println(measure.light);
-  delay(2);
+  #ifdef LDR
+    Serial.print("LIGHT ");
+    Serial.println(measure.light);
+    delay(2);
+  #endif
   Serial.print("HUMI ");
   Serial.println(measure.humi);
   delay(2);
-  #if DS_COUNT > 1
-  for (byte i=0; i < DS_COUNT; i++) { 
-    Serial.print("TEMP");
-    Serial.print(i);
-    Serial.print(" ");
-    Serial.println(ds_array[i]);
-  }
-  #else
-    Serial.print("TEMP ");
-    Serial.println(measure.temp);
+  #ifdef DS18B20 || SHT21_SENSOR || DHT_SENSOR
+    #ifdef DS_COUNT && DS_COUNT > 1
+      for (byte i=0; i < DS_COUNT; i++) { 
+        Serial.print("TEMP");
+        Serial.print(i);
+        Serial.print(" ");
+        Serial.println(ds_array[i]);
+      }
+    #else
+      Serial.print("TEMP ");
+      Serial.println(measure.temp);
+    #endif
+    #else
+      Serial.print("TEMP ");
+      Serial.println(measure.temp);
   #endif
   Serial.print("PRES ");
   Serial.println(measure.pressure);
@@ -261,46 +237,35 @@ static void transmissionRS()
   Serial.print("BATVOL ");
   Serial.println(measure.battvol);
   delay(2);
-  Serial.print("VCCREF "); 
-  Serial.println(vccRef());
-  delay(2);
   Serial.println(' ');
   delay(2);
   activityLed(0);
 }
 
 
-static void activityLed (byte on) {
-  pinMode(ACT_LED, OUTPUT);
-  digitalWrite(ACT_LED, on);
-  delay(150);
-}
-
-
 static void doMeasure() {
   count++;
-  tempReading = 0;
+  adcreading = 0;
 
   measure.lobat = rf12_lowbat();
   measure.battvol = battVolts();
   
-#define LDR_SENSOR
+#ifdef LDR_SENSOR
   if ((count % 2) == 0) {
-     measure.light = ldr.anaRead();
+     measure.light = analogRead(LDR_PIN);
   }
+#endif
 
 #ifdef I2C
  #ifdef SHT21_SENSOR
-  float shthumi = SHT2x.GetHumidity();
-  #ifndef DS18B20
-    float shttemp = SHT2x.GetTemperature();
-  #endif
-  measure.humi = shthumi * 10;
-  #ifndef DS18B20
-    measure.temp = shttemp * 10;
-  #endif
+   float shthumi = SHT2x.GetHumidity();
+   measure.humi = shthumi * 10;
+   #ifndef DS18B20
+     float shttemp = SHT2x.GetTemperature();
+     measure.temp = shttemp * 10;
+   #endif
+ #endif
 
-#endif
  #ifdef BMP_SENSOR 
   Sleepy::loseSomeTime(250);
   BMP085.getCalData();
@@ -333,6 +298,7 @@ static void doMeasure() {
   #endif
 #endif
 
+
 #ifdef DHT_SENSOR
  #ifndef SHT21
    float h = dht.readHumidity();
@@ -352,6 +318,22 @@ static void doMeasure() {
 #endif
 }
 
+static void sendPayload()
+{
+  doMeasure(); // measure
+  #ifdef DEBUG
+     transmissionRS();
+  #endif
+  #ifdef LED_ON
+    activityLed(1);
+  #endif
+  #ifndef DEV_MODE
+    doReport(); // send
+  #endif
+  #ifdef LED_ON
+    activityLed(0);
+  #endif
+}
 
 // Main loop
 void loop() {
