@@ -181,9 +181,9 @@ long readVcc() {
 
 
 int battVolts(void) {
-  adcreading=analogRead(BAT_VOL) * 2;
   double vccref = readVcc()/1000.0;
-  double battvol = (adcreading / 1023.0) * vccref;
+  adcreading=analogRead(BAT_VOL) * 2;
+  double battvol = (tempReading / 1023.0) * vccref;
   return battvol * 1000;
 }
 
