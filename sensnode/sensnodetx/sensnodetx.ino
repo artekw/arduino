@@ -4,9 +4,7 @@ Written by Artur Wronowski <artur.wronowski@digi-led.pl>
 Need Arduino 1.0 to compile
 
 TODO:
-- srednia z pomiarow
 - wiartomierz //#define ObwAnem 0.25434 // meters
-- http://hacking.majenko.co.uk/node/57
 */
 
 #include "configuration.h"
@@ -38,7 +36,7 @@ TODO:
   #define DHTPIN            4  // port P1 = digital 4
 #endif
 
-#ifdef SHT21_SENSOR || BMP_SENSOR
+#if defined SHT21_SENSOR || defined BMP_SENSOR
   #define I2C
 #endif
 
@@ -107,14 +105,13 @@ ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 #ifdef NEW_REV
   Port p1 (1); // JeeLabs Port P1
   Port p2 (2); // JeeLabs Port P2
-  Port batvol (3);
 #endif
 
 #ifdef DS18B20
-    #define TEMPERATURE_PRECISION 9
-    OneWire oneWire(ONEWIRE_DATA);
-    DallasTemperature sensors(&oneWire);
-    DeviceAddress tempDeviceAddress;
+  #define TEMPERATURE_PRECISION 9
+  OneWire oneWire(ONEWIRE_DATA);
+  DallasTemperature sensors(&oneWire);
+  DeviceAddress tempDeviceAddress;
 #endif
 
 #ifdef DHT_SENSOR
@@ -140,16 +137,16 @@ void setup()
 #endif
 
 #ifdef I2C
-    Wire.begin();
+  Wire.begin();
 #endif
 
 #ifdef DEBUG
-    Serial.begin(DEBUG_BAUD);
+  Serial.begin(DEBUG_BAUD);
 #endif
 
 #ifdef DS18B20
-    sensors.begin();
-    numberOfDevices = sensors.getDeviceCount();
+  sensors.begin();
+  numberOfDevices = sensors.getDeviceCount();
 #endif
 
 }
@@ -187,7 +184,7 @@ int battVolts(void) {
     analogReference(INTERNAL);
   #endif
   double vccref = readVcc()/1000.0;
-  for(byte i = 0; i <= 3; i++) adcreading=analogRead(BAT_VOL) * 2;
+  adcreading = analogRead(BAT_VOL) * 2;
   double battvol = (adcreading / 1023.0) * vccref;
   return battvol * 1000;
 }
@@ -217,7 +214,7 @@ static void transmissionRS()
   Serial.print("HUMI ");
   Serial.println(measure.humi);
   delay(2);
-  #ifdef DS18B20 || SHT21_SENSOR || DHT_SENSOR
+  #if defined DS18B20 || defined SHT21_SENSOR || defined DHT_SENSOR
     #ifdef DS_COUNT && DS_COUNT > 1
       for (byte i=0; i < DS_COUNT; i++) { 
         Serial.print("TEMP");
@@ -262,21 +259,21 @@ static void doMeasure() {
 #endif
 
 #ifdef I2C
- #ifdef SHT21_SENSOR
-   float shthumi = SHT2x.GetHumidity();
-   measure.humi = shthumi * 10;
-   #ifndef DS18B20
-     float shttemp = SHT2x.GetTemperature();
-     measure.temp = shttemp * 10;
-   #endif
- #endif
+  #ifdef SHT21_SENSOR
+    float shthumi = SHT2x.GetHumidity();
+    measure.humi = shthumi * 10;
+    #ifndef DS18B20
+      float shttemp = SHT2x.GetTemperature();
+      measure.temp = shttemp * 10;
+    #endif
+  #endif
 
- #ifdef BMP_SENSOR 
-  Sleepy::loseSomeTime(250);
-  BMP085.getCalData();
-  BMP085.readSensor();
-  measure.pressure = ((BMP085.press*10*10) + 16);
- #endif
+  #ifdef BMP_SENSOR 
+    Sleepy::loseSomeTime(250);
+    BMP085.getCalData();
+    BMP085.readSensor();
+    measure.pressure = ((BMP085.press*10*10) + 16);
+  #endif
 #endif
 
 #ifdef DS18B20
