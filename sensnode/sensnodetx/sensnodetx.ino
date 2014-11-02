@@ -247,7 +247,6 @@ static void transmissionRS()
 
 static void doMeasure() {
   count++;
-  adcreading = 0;
 
   measure.lobat = rf12_lowbat();
   measure.battvol = battVolts();
