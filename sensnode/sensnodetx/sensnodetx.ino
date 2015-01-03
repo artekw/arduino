@@ -8,20 +8,27 @@ TODO:
 */
 
 #include "configuration.h"
+
+#if RFM69 == 1
+   #define RF69_COMPAT 1
+#else
+   #define RF69_COMPAT 0
+#endif
+
 // libs for I2C and DS18B20
 #include <Wire.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
-// lisb for SHT21 and BMP085
+// lib for SHT21 and BMP085
 #include <BMP085.h>
 #include <SHT2x.h>
-//#include <Adafruit_BMP085.h>
 // lib for RFM12B from https://github.com/jcw/jeelib
 #include <JeeLib.h>
 // avr sleep instructions
 #include <avr/sleep.h>
 // DHT11 and DHT22 from https://github.com/adafruit/DHT-sensor-library
 #include "DHT.h"
+
 
 /*************************************************************/
 
@@ -87,7 +94,7 @@ int volts;
 typedef struct {
   int light;
   int humi;
-  #ifdef DS18B20 && DS_COUNT > 1
+  #if defined DS18B20 && defined DS_COUNT > 1
     int temp0;
     int temp1;
     int temp2;
@@ -95,7 +102,6 @@ typedef struct {
     int temp;
   #endif
   int pressure;
-  byte lobat      :1;
   int battvol;
 } Payload;
 Payload measure;
@@ -127,8 +133,7 @@ void setup()
   #if BAND == 868
     rf12_initialize(NODEID, RF12_868MHZ, NETWORK);
   #endif
-  rf12_control(0xC040); // 2.2v low
-  #if LOWRATE
+  #if defined LOWRATE & defined RFM69
     rf12_control(0xC623); // ~9.6kbps
   #endif
 
@@ -215,7 +220,7 @@ static void transmissionRS()
   Serial.println(measure.humi);
   delay(2);
   #if defined DS18B20 || defined SHT21_SENSOR || defined DHT_SENSOR
-    #ifdef DS_COUNT && DS_COUNT > 1
+    #if defined DS_COUNT && defined DS_COUNT > 1
       for (byte i=0; i < DS_COUNT; i++) { 
         Serial.print("TEMP");
         Serial.print(i);
@@ -233,9 +238,6 @@ static void transmissionRS()
   Serial.print("PRES ");
   Serial.println(measure.pressure);
   delay(2);
-  Serial.print("LOBAT " );
-  Serial.println(measure.lobat, DEC);
-  delay(2);
   Serial.print("BATVOL ");
   Serial.println(measure.battvol);
   delay(2);
@@ -248,7 +250,6 @@ static void transmissionRS()
 static void doMeasure() {
   count++;
 
-  measure.lobat = rf12_lowbat();
   measure.battvol = battVolts();
   
 #ifdef LDR_SENSOR
