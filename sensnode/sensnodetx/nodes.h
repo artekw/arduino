@@ -1,0 +1,26 @@
+#ifndef NODES_H
+#define NODES_H
+
+/* Defines a name of node and its node id */
+
+// rooms
+
+#define artekroom		2
+#define kamilroom		5
+#define salon			4
+#define garaz			19
+
+// out
+
+#define outnode			3
+
+// devices
+
+#define powernode		25
+
+// others
+
+#define testnode		15
+
+
+#endif //__NODES_H

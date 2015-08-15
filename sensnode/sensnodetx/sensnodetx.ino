@@ -1,5 +1,5 @@
 /*
-SensnodeTX v3.4-dev
+SensnodeTX v4.0-dev
 Written by Artur Wronowski <artur.wronowski@digi-led.pl>
 Need Arduino 1.0 to compile
 
@@ -15,25 +15,34 @@ TODO:
    #define RF69_COMPAT 0
 #endif
 
-// libs for I2C and DS18B20
 #include <Wire.h>
-#include <OneWire.h>
-#include <DallasTemperature.h>
+#if defined DS18B20
+   #include <OneWire.h>
+   #include <DallasTemperature.h>
+#endif
 // lib for SHT21 and BMP085
-#include <BMP085.h>
-#include <SHT2x.h>
+#if defined SHT21_SENSOR || BMP_SENSOR 
+   #include <BMP085.h>
+   #include <SHT2x.h>
+#endif
 // lib for RFM12B from https://github.com/jcw/jeelib
 #include <JeeLib.h>
 // avr sleep instructions
 #include <avr/sleep.h>
 // DHT11 and DHT22 from https://github.com/adafruit/DHT-sensor-library
-#include "DHT.h"
-
+#ifdef DHT_SENSOR
+   #include "DHT.h"
+#endif
+#ifdef OLED
+   #include <OzOLED.h>
+#endif
+#include "boards.h"
+#include "nodes.h"
 
 /*************************************************************/
 
 #ifdef DS18B20
-  int ds_array[DS_COUNT];
+  byte ds_array[DS_COUNT];
 #endif
 
 #ifdef DHT_SENSOR
@@ -57,37 +66,10 @@ TODO:
 
 /*************************************************************/
 
-// Input/Output definition
-// Analog
-#ifdef NEW_REV //3.4
-  #define LDR_PIN           2
-  #define BAT_VOL           3
-#else //3.0
-  #define LDR_PIN           0
-  #define BAT_VOL           1
-  #define CustomA3          3
-#endif
-
-// Digital
-#ifdef NEW_REV //3.4
-  #define MOSFET            7
-  #define ONEWIRE_DATA      8
-  #define ACT_LED           9
-#else //3.0
-  #define CustomD3          3
-  #define CustomD4          4
-  #define MOSFET            5
-  #define ONEWIRE_DATA      8
-  #define ACT_LED           9
-#endif
-
-/************************************************************/
-
 byte count = 0;
 unsigned int adcreading;
-int numberOfDevices;
+byte numberOfDevices;
 int volts;
-
 
 // structure of sended data
 
@@ -103,15 +85,14 @@ typedef struct {
   #endif
   int pressure;
   int battvol;
+#ifdef AIRQ
+  int co2;
+#endif
 } Payload;
 Payload measure;
 
 ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 
-#ifdef NEW_REV
-  Port p1 (1); // JeeLabs Port P1
-  Port p2 (2); // JeeLabs Port P2
-#endif
 
 #ifdef DS18B20
   #define TEMPERATURE_PRECISION 9
@@ -124,6 +105,11 @@ ISR(WDT_vect) { Sleepy::watchdogEvent(); }
   DHT dht(DHTPIN, DHTTYPE);
 #endif
 
+#ifdef AIRQ
+  #define AIRQ_PIN 1
+  Port air (AIRQ_PIN);  //P1
+#endif
+
 
 void setup()
 {
@@ -133,7 +119,7 @@ void setup()
   #if BAND == 868
     rf12_initialize(NODEID, RF12_868MHZ, NETWORK);
   #endif
-  #if defined LOWRATE & defined RFM69
+  #if defined LOWRATE & defined RFM69 == 0
     rf12_control(0xC623); // ~9.6kbps
   #endif
 
@@ -154,15 +140,24 @@ void setup()
   numberOfDevices = sensors.getDeviceCount();
 #endif
 
+#ifdef AIRQ
+  air.mode(INPUT);
+#endif
+
+#ifdef OLED
+  OzOled.init();
+  OzOled.clearDisplay();
+  OzOled.setPageMode();
+#endif
 }
 
 
 static void doReport()
 {
-  rf12_sleep(RF12_SLEEP);
+  rf12_sleep(RF12_WAKEUP);
   while (!rf12_canSend())
     rf12_recvDone();
-  rf12_sendStart(0, &measure, sizeof measure);
+  rf12_sendNow(0, &measure, sizeof measure);
   rf12_sendWait(RADIO_SYNC_MODE);
   rf12_sleep(RF12_SLEEP);
 }
@@ -189,7 +184,12 @@ int battVolts(void) {
     analogReference(INTERNAL);
   #endif
   double vccref = readVcc()/1000.0;
-  adcreading = analogRead(BAT_VOL) * 2;
+  #if BOARD_REV == 4
+    float resistor_tolerance = 1.06; // 1%
+	adcreading = analogRead(BAT_VOL) * 10 * resistor_tolerance;
+  #else
+	adcreading = analogRead(BAT_VOL) * 2;
+  #endif
   double battvol = (adcreading / 1023.0) * vccref;
   return battvol * 1000;
 }
@@ -238,6 +238,10 @@ static void transmissionRS()
   Serial.print("PRES ");
   Serial.println(measure.pressure);
   delay(2);
+  #ifdef AIRQ
+    Serial.print("CO2 ");
+    Serial.println(measure.co2);
+  #endif
   Serial.print("BATVOL ");
   Serial.println(measure.battvol);
   delay(2);
@@ -250,7 +254,11 @@ static void transmissionRS()
 static void doMeasure() {
   count++;
 
+#if defined FAKE_BAT
+  measure.battvol = 5000;
+#else
   measure.battvol = battVolts();
+#endif
   
 #ifdef LDR_SENSOR
   if ((count % 2) == 0) {
@@ -318,7 +326,57 @@ static void doMeasure() {
    }
   #endif
 #endif
+
+#ifdef AIRQ
+  byte i = 0;
+  float val = 0;
+  for(i=0;i<20;i++) {
+    val += air.anaRead();
+    delay(100);
+  }
+  measure.co2 = (val/20.0) * 10;
+#endif
+
 }
+
+
+static void doDisplay() {
+#ifdef OLED
+  OzOled.setCursorXY(0,0);
+  OzOled.printString("-=");
+  OzOled.setCursorXY(4,0);
+  OzOled.printString(NODENAME);
+  OzOled.setCursorXY(14,0);
+  OzOled.printString("=-");
+
+  OzOled.setCursorXY(0,2);
+  OzOled.printString("BAT:");
+  OzOled.setCursorXY(6,2);
+  OzOled.printNumber((float)measure.battvol/1000, 2);
+  OzOled.setCursorXY(13,2);
+  OzOled.printString("V");
+
+  #ifdef DS18B20
+    OzOled.setCursorXY(0,4);
+    OzOled.printString("TEMP:");
+    OzOled.setCursorXY(6,4);
+    OzOled.printNumber((float)measure.temp/10, 2);
+    OzOled.setCursorXY(13,4);
+    OzOled.printString("C");
+  #endif
+
+  #ifdef AIRQ
+    OzOled.setCursorXY(0,6);
+    OzOled.printString("AIRQ:");
+    OzOled.setCursorXY(6,6);
+    OzOled.printNumber((float)measure.co2/10, 2);
+    OzOled.setCursorXY(13,6);
+    OzOled.printString("ppm");
+  #endif
+
+#endif
+}
+
 
 static void sendPayload()
 {
@@ -335,11 +393,20 @@ static void sendPayload()
   #ifdef LED_ON
     activityLed(0);
   #endif
+  doDisplay();
 }
+
 
 // Main loop
 void loop() {
-  int vcc = battVolts();
+  int vcc;
+  
+#if defined FAKE_BAT
+  vcc = 5000;
+#else
+  vcc = battVolts();
+#endif
+
   
   if (vcc <= VCC_FINAL) { // ostatni mozliwy pakiet
     sendPayload();

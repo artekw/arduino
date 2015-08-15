@@ -1,6 +1,6 @@
 // sensbase v2.0
 
-#define RF69_COMPAT 1
+#define RF69_COMPAT 0
 
 #include <JeeLib.h>
 
@@ -11,7 +11,7 @@
 
 static byte ACT_LED       = 9;
 static byte NODEID        = 30;  // 31 for any node(all)
-static byte BAND          = 200; // 0-255
+static byte BAND          = 210; // 0-255
 static int BAUD           = 9600; // serial speed
 
 /*************************************************************/
@@ -51,7 +51,6 @@ void loop () {
         activityLed(1);
       }
     if (RF12_WANTS_ACK) {
-        //rf12_sendStart(RF12_ACK_REPLY, 0, 0);
         rf12_sendNow(RF12_ACK_REPLY,0,0);
     }
     //memset(str, 0, sizeof(str)); // clear
