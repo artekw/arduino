@@ -8,6 +8,7 @@ TODO:
 */
 
 #include "configuration.h"
+#include "profiles.h"
 
 #if RFM69 == 1
    #define RF69_COMPAT 1
@@ -38,6 +39,7 @@ TODO:
 #endif
 #include "boards.h"
 #include "nodes.h"
+#include <stdlib.h>
 
 /*************************************************************/
 
@@ -70,6 +72,9 @@ byte count = 0;
 unsigned int adcreading;
 byte numberOfDevices;
 int volts;
+unsigned long start, finished, elapsed;
+float h,m,s,ms;
+char buf[10];
 
 // structure of sended data
 
@@ -349,20 +354,27 @@ static void doDisplay() {
   OzOled.setCursorXY(14,0);
   OzOled.printString("=-");
 
-  OzOled.setCursorXY(0,2);
+  OzOled.setCursorXY(0,4);
   OzOled.printString("BAT:");
-  OzOled.setCursorXY(6,2);
+  OzOled.setCursorXY(6,4);
   OzOled.printNumber((float)measure.battvol/1000, 2);
-  OzOled.setCursorXY(13,2);
+  OzOled.setCursorXY(13,4);
   OzOled.printString("V");
-
+/*
+  OzOled.setCursorXY(0,6);
+  OzOled.printString("LUPD:");
+  OzOled.setCursorXY(6,6);
+  OzOled.printNumber((float)(m * 60)+s);
+  OzOled.setCursorXY(13,6);
+  OzOled.printString("s");
+*/
   #ifdef DS18B20
-    OzOled.setCursorXY(0,4);
+    OzOled.setCursorXY(0,2);
     OzOled.printString("TEMP:");
-    OzOled.setCursorXY(6,4);
+    OzOled.setCursorXY(6,2);
     OzOled.printNumber((float)measure.temp/10, 2);
-    OzOled.setCursorXY(13,4);
-    OzOled.printString("C");
+    OzOled.setCursorXY(13,2);
+    OzOled.printString("*C");
   #endif
 
   #ifdef AIRQ
@@ -407,6 +419,7 @@ void loop() {
   vcc = battVolts();
 #endif
 
+  start = millis();
   
   if (vcc <= VCC_FINAL) { // ostatni mozliwy pakiet
     sendPayload();
@@ -425,5 +438,15 @@ void loop() {
       Sleepy::loseSomeTime(6000);
     #endif
 
+  
+  finished = millis();
+  unsigned long over;
+  elapsed = finished-start;
+  h=int(elapsed/3600000);
+  over=elapsed%3600000;
+  m=int(over/60000);
+  over=over%60000;
+  s=int(over/1000);
+  ms=over%1000;
 }
 

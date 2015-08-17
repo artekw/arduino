@@ -2,7 +2,7 @@
 #define CONFIGURATION_H
 
 //************ RADIO MODULE *************
-#define NODENAME			"TESTNODE"
+#define NODENAME			"TESTNODE"  // for OLED display
 #define NODEID              testnode    // name of node- look nodes.h
 #define NETWORK             210
 #define RFM69               1     // RFM12 compat mode for RFM69CW
@@ -16,7 +16,7 @@
 //*********** SENSORS ******************
 // Used devices (comment or uncomment if not used)
 //#define LDR_SENSOR                    // use LDR sensor
-#define DS18B20                  // use 1WIE DS18B20
+//#define DS18B20                  // use 1WIE DS18B20
 #define DS_COUNT           1	 // TO FIX; NOW ONLY 1 or 3 sensors
 
 //#define SHT21_SENSOR           // use SHT21
@@ -27,8 +27,8 @@
 //#define AIRQ                  	 // Air Quality - MQ-135 eg. FC-22
 
 //*********** OTHER ******************
-#define LED_ON                 // use act led for transmission
-#define OLED
+//#define LED_ON                 // use act led for transmission
+//#define OLED
 //#define FAKE_BAT
 
 //#define DEV_MODE               // display output only on console, do not send packages via radio
