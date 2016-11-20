@@ -1,3 +1,11 @@
+#define RFM69 1
+
+#if RFM69 == 1
+   #define RF69_COMPAT 1
+#else
+   #define RF69_COMPAT 0
+#endif
+
 #include <JeeLib.h>
 #include <PCF8574.h>
 #include <Wire.h>
@@ -51,13 +59,16 @@ void loop () {
         /* process cmd */
         switch (rxdata.state) {
             case 0:
-                i2crelay_1.digitalWrite(1, HIGH);
+                //i2crelay_1.digitalWrite(1, HIGH);
+                Serial.print("ON");
                 break;
             case 1:
-                i2crelay_1.digitalWrite(1, LOW);
+                //i2crelay_1.digitalWrite(1, LOW);
+                Serial.print("OFF");
                 break;
             default:
-                i2crelay_1.digitalWrite(1, LOW);
+                //i2crelay_1.digitalWrite(1, LOW);
+                Serial.print(' ');
         }
       }
       else if (rxdata.cmd == 2) {

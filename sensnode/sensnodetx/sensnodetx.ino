@@ -1,12 +1,13 @@
-/*
+ /*
 SensnodeTX v4.0-dev
 Written by Artur Wronowski <artur.wronowski@digi-led.pl>
-Need Arduino 1.0 to compile
+Bassed od Jeenode projekt by Jean-Claude Wippler <jc@wippler.nl>
 
 TODO:
 - wiartomierz //#define ObwAnem 0.25434 // meters
 */
 
+#include "nodes.h"
 #include "configuration.h"
 #include "profiles.h"
 
@@ -22,7 +23,7 @@ TODO:
    #include <DallasTemperature.h>
 #endif
 // lib for SHT21 and BMP085
-#if defined SHT21_SENSOR || BMP_SENSOR 
+#if defined SHT21_SENSOR || defined BMP_SENSOR 
    #include <BMP085.h>
    #include <SHT2x.h>
 #endif
@@ -36,10 +37,11 @@ TODO:
 #endif
 #ifdef OLED
    #include <OzOLED.h>
+   #include <stdlib.h>
 #endif
 #include "boards.h"
-#include "nodes.h"
-#include <stdlib.h>
+
+
 
 /*************************************************************/
 
@@ -72,8 +74,8 @@ byte count = 0;
 unsigned int adcreading;
 byte numberOfDevices;
 int volts;
-unsigned long start, finished, elapsed;
-float h,m,s,ms;
+byte receivedOK = 0;
+
 char buf[10];
 
 // structure of sended data
@@ -93,8 +95,18 @@ typedef struct {
 #ifdef AIRQ
   int co2;
 #endif
-} Payload;
-Payload measure;
+#ifdef LPG
+  int lpg;
+#endif
+} PayloadTX;
+PayloadTX measure;
+
+typedef struct {
+    byte destnode;
+    byte cmd;
+    byte state :1;
+} PayloadRX;
+PayloadRX rxdata;
 
 ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 
@@ -110,11 +122,22 @@ ISR(WDT_vect) { Sleepy::watchdogEvent(); }
   DHT dht(DHTPIN, DHTTYPE);
 #endif
 
-#ifdef AIRQ
-  #define AIRQ_PIN 1
-  Port air (AIRQ_PIN);  //P1
+
+#ifdef RELAY
+  #define RELAY_PIN 1
+  Port relay (RELAY_PIN); //P1
 #endif
 
+
+#ifdef LPG
+  #define LPG_PIN 2
+  Port lpg (LPG_PIN);    //P2
+#endif
+
+#ifdef AIRQ
+  #define AIRQ_PIN 3
+  Port air (AIRQ_PIN);  //P3
+#endif
 
 void setup()
 {
@@ -149,6 +172,14 @@ void setup()
   air.mode(INPUT);
 #endif
 
+#ifdef RELAY
+  relay.mode(OUTPUT);
+#endif
+
+#ifdef LPG
+  lpg.mode(INPUT);
+#endif
+
 #ifdef OLED
   OzOled.init();
   OzOled.clearDisplay();
@@ -157,7 +188,7 @@ void setup()
 }
 
 
-static void doReport()
+void doReport()
 {
   rf12_sleep(RF12_WAKEUP);
   while (!rf12_canSend())
@@ -165,6 +196,35 @@ static void doReport()
   rf12_sendNow(0, &measure, sizeof measure);
   rf12_sendWait(RADIO_SYNC_MODE);
   rf12_sleep(RF12_SLEEP);
+}
+
+
+void doReceive() {
+  if (rf12_recvDone() && rf12_crc == 0 && rf12_len == sizeof rxdata) {
+    #ifdef LED_ON
+      recvLED();
+    #endif
+    memcpy(&rxdata, (void*) rf12_data, sizeof rxdata);
+    if(RF12_WANTS_ACK){
+      rf12_sendStart(RF12_ACK_REPLY,0,0);
+    }
+  }
+
+  if (rxdata.destnode == NODEID) {
+    // Custom commands
+    // eg. ON/OFF SSR Relay
+    if (rxdata.cmd == 1) {
+      if (rxdata.state == 1) {
+        receivedOK = 1;
+        relay.digiWrite(1);
+      }
+      else {
+        receivedOK = 0;
+        relay.digiWrite(0);
+
+      }
+    }
+  }
 }
 
 
@@ -191,8 +251,10 @@ int battVolts(void) {
   double vccref = readVcc()/1000.0;
   #if BOARD_REV == 4
     float resistor_tolerance = 1.06; // 1%
+    // R6 = 1M %1, R7 = 10M %1
 	adcreading = analogRead(BAT_VOL) * 10 * resistor_tolerance;
   #else
+  // R6 = 1M %1, R7 = 1M %1
 	adcreading = analogRead(BAT_VOL) * 2;
   #endif
   double battvol = (adcreading / 1023.0) * vccref;
@@ -200,20 +262,34 @@ int battVolts(void) {
 }
 
 
-static void activityLed (byte on) {
+void sendLED(byte on) {
   pinMode(ACT_LED, OUTPUT);
   digitalWrite(ACT_LED, on);
-  delay(150);
+  delay(100);
 }
 
 
-static void transmissionRS()
+void recvLED() {
+  pinMode(ACT_LED, OUTPUT);
+  digitalWrite(ACT_LED, HIGH);
+  delay(50);
+  digitalWrite(ACT_LED, LOW);
+  delay(100);
+  digitalWrite(ACT_LED, HIGH);
+  delay(50);
+  digitalWrite(ACT_LED, LOW);
+}
+
+
+void transmissionRS()
 {
   #ifdef DEV_MODE
     Serial.println("==DEV MODE==");
+    Serial.print("NODEID: ");
+    Serial.print(NODEID);
     delay(2);
   #endif
-  activityLed(1);
+  //sendLED(1);
   Serial.println(' ');
   delay(2);
   #ifdef LDR_SENSOR
@@ -247,16 +323,24 @@ static void transmissionRS()
     Serial.print("CO2 ");
     Serial.println(measure.co2);
   #endif
+  delay(2);
+  #ifdef LPG
+    Serial.print("LPG ");
+    Serial.println(measure.lpg);
+  #endif
   Serial.print("BATVOL ");
   Serial.println(measure.battvol);
   delay(2);
   Serial.println(' ');
+  Serial.print("RECEIVED ");
+  Serial.println(receivedOK);
+  Serial.println(' ');
   delay(2);
-  activityLed(0);
+  //sendLED(0);
 }
 
 
-static void doMeasure() {
+void doMeasure() {
   count++;
 
 #if defined FAKE_BAT
@@ -342,10 +426,19 @@ static void doMeasure() {
   measure.co2 = (val/20.0) * 10;
 #endif
 
+#ifdef LPG
+  byte i = 0;
+  float val = 0;
+  for(i=0;i<20;i++) {
+    val += lpg.anaRead();
+    delay(100);
+  }
+  measure.lpg = (val/20.0) * 10;
+#endif
 }
 
 
-static void doDisplay() {
+void doDisplay() {
 #ifdef OLED
   OzOled.setCursorXY(0,0);
   OzOled.printString("-=");
@@ -390,22 +483,24 @@ static void doDisplay() {
 }
 
 
-static void sendPayload()
+void sendPayload()
 {
   doMeasure(); // measure
   #ifdef DEBUG
-     transmissionRS();
+    transmissionRS();
   #endif
   #ifdef LED_ON
-    activityLed(1);
+    sendLED(1);
   #endif
   #ifndef DEV_MODE
     doReport(); // send
   #endif
   #ifdef LED_ON
-    activityLed(0);
+    sendLED(0);
   #endif
-  doDisplay();
+  #ifdef OLED
+    doDisplay();
+  #endif
 }
 
 
@@ -418,8 +513,6 @@ void loop() {
 #else
   vcc = battVolts();
 #endif
-
-  start = millis();
   
   if (vcc <= VCC_FINAL) { // ostatni mozliwy pakiet
     sendPayload();
@@ -431,22 +524,19 @@ void loop() {
   }
 
   int minutes = VCC_SLEEP_MINS(vcc);
+  
   while (minutes-- > 0)
     #ifndef DEV_MODE
-      Sleepy::loseSomeTime(60000);
+      //Sleepy::loseSomeTime(60000);
+      for (int i = 0; i < 60000/70; ++i) {
+        Sleepy::loseSomeTime(70);
+        doReceive();
+      }
     #else
-      Sleepy::loseSomeTime(6000);
+      //Sleepy::loseSomeTime(6000);
+      for (int i = 0; i < 6000/70; ++i) {
+        Sleepy::loseSomeTime(70);
+        doReceive();
+      }
     #endif
-
-  
-  finished = millis();
-  unsigned long over;
-  elapsed = finished-start;
-  h=int(elapsed/3600000);
-  over=elapsed%3600000;
-  m=int(over/60000);
-  over=over%60000;
-  s=int(over/1000);
-  ms=over%1000;
 }
-

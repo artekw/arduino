@@ -7,8 +7,9 @@
 
 #define artekroom		2
 #define kamilroom		5
-#define salon			4
-#define garaz			19
+#define salon			  4
+#define babcia      6
+#define garaz			  19
 
 // out
 
@@ -21,6 +22,7 @@
 // others
 
 #define testnode		15
+#define car         24
 
 
 #endif //__NODES_H

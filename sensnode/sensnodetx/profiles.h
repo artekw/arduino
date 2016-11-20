@@ -1,22 +1,64 @@
 #ifndef PROFILES_H
 #define PROFILES_H
 
-/* Defines sensors and functioons per node */
+/* Defines:
+  * sensors
+  * board rev (BOARD_REV variable)
+  * wireless module (RFM69 variable)
+*/
 
 // rooms
 
 #if NODEID == artekroom
+  #define RFM69 0
+  #define BOARD_REV 4
 	#define DS18B20
 	#define SHT21_SENSOR
 	#define BMP_SENSOR
 #endif
 
+#if NODEID == salon
+  #define RFM69 1
+  #define BOARD_REV 4
+  #define SHT21_SENSOR
+#endif
+
+#if NODEID == babcia
+  #define RFM69 1
+  #define BOARD_REV 4
+  #define DS18B20
+#endif
+
+#if NODEID == garaz
+  #define RFM69 0
+  #define BOARD_REV 3
+  #define SHT21_SENSOR
+  #define LPG
+#endif
+
+
 // others
 
+
 #if NODEID == testnode
-	#define DS18B20
-	#define OLED
-	#define AIRQ
+  #define RFM69 1
+  #define BOARD_REV 4
+  #define DS18B20
+  #define SHT21_SENSOR
+  #define BMP_SENSOR
+#endif
+
+#if NODEID == car
+  #define RFM69 0
+  #define BOARD_REV 4
+  #define DS18B20
+  #define LED_ON
+#endif
+
+#if NODEID == outnode
+  #define RFM69 0
+  #define BOARD_REV 4
+  #define DS18B20
 #endif
 
 #endif //__PROFILES_H

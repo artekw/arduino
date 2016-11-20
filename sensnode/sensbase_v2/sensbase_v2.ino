@@ -11,7 +11,7 @@
 
 static byte ACT_LED       = 9;
 static byte NODEID        = 30;  // 31 for any node(all)
-static byte BAND          = 210; // 0-255
+static byte NETWORK       = 100; // 0-255
 static int BAUD           = 9600; // serial speed
 
 /*************************************************************/
@@ -29,7 +29,7 @@ Payload rxdata;
 
 void setup () {
   Serial.begin(BAUD);
-  rf12_initialize(NODEID, RF12_433MHZ, BAND);
+  rf12_initialize(NODEID, RF12_433MHZ, NETWORK);
   pinMode(ACT_LED, OUTPUT);
   activityLed(0);
 }
