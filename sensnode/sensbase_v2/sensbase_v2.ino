@@ -1,6 +1,6 @@
 // sensbase v2.0
 
-#define RF69_COMPAT 0
+#define RF69_COMPAT 1
 
 #include <JeeLib.h>
 
@@ -9,10 +9,10 @@
 #define BINARY 1 // rf12demo https://github.com/jcw/jeelib/blob/master/examples/RF12/RF12demo/RF12demo.ino
 #define DEBUG 0
 
-static byte ACT_LED       = 9;
-static byte NODEID        = 30;  // 31 for any node(all)
-static byte NETWORK       = 100; // 0-255
-static int BAUD           = 9600; // serial speed
+static byte ACT_LED       = 13;
+static byte NODEID        = 29;  // 31 for any node(all)
+static byte NETWORK       = 210; // 0-255
+static int BAUD           = 115200; // serial speed
 
 /*************************************************************/
 char ramka[5];
@@ -29,6 +29,7 @@ Payload rxdata;
 
 void setup () {
   Serial.begin(BAUD);
+  Serial.println("S");
   rf12_initialize(NODEID, RF12_433MHZ, NETWORK);
   pinMode(ACT_LED, OUTPUT);
   activityLed(0);
@@ -67,7 +68,7 @@ void loop () {
     }
 
     if (DEBUG) {
-      Serial.println("Wyslano");
+      Serial.println("ACK"); // ack
     }
 
     rxdata.destnode = (ramka[0] * 10) + ramka[1];

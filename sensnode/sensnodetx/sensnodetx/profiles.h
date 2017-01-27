@@ -27,6 +27,7 @@
   #define RFM69 1
   #define BOARD_REV 4
   #define DS18B20
+  #define RELAY
 #endif
 
 #if NODEID == garaz

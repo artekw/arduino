@@ -25,7 +25,7 @@
 //#define AIRQ                  	 // Air Quality - MQ-135 eg. FC-22
 //#define LPG                      // LPG - MQ-6
 
-#define RELAY                      // SSR Relay
+// #define RELAY                      // SSR Relay
 //*********** OTHER ******************
 #define LED_ON                 // use act led for transmission
 //#define OLED

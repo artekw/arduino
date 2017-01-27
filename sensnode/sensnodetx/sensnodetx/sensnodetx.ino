@@ -1,5 +1,7 @@
+#include <Arduino.h>
+
  /*
-SensnodeTX v4.0-dev
+SensnodeTX v4.1-dev
 Written by Artur Wronowski <artur.wronowski@digi-led.pl>
 Bassed od Jeenode projekt by Jean-Claude Wippler <jc@wippler.nl>
 
@@ -39,9 +41,9 @@ TODO:
    #include <OzOLED.h>
    #include <stdlib.h>
 #endif
+// EEPROM needed for relay states
+#include <EEPROM.h>
 #include "boards.h"
-
-
 
 /*************************************************************/
 
@@ -75,6 +77,7 @@ unsigned int adcreading;
 byte numberOfDevices;
 int volts;
 byte receivedOK = 0;
+byte relay_eeprom_addr = 0;
 
 char buf[10];
 
@@ -97,6 +100,9 @@ typedef struct {
 #endif
 #ifdef LPG
   int lpg;
+#endif
+#ifdef RELAY
+  byte relay :1;
 #endif
 } PayloadTX;
 PayloadTX measure;
@@ -216,10 +222,12 @@ void doReceive() {
     if (rxdata.cmd == 1) {
       if (rxdata.state == 1) {
         receivedOK = 1;
+        EEPROM.write(relay_eeprom_addr, rxdata.state);
         relay.digiWrite(1);
       }
       else {
         receivedOK = 0;
+        EEPROM.write(relay_eeprom_addr, rxdata.state);
         relay.digiWrite(0);
 
       }
@@ -333,7 +341,7 @@ void transmissionRS()
   delay(2);
   Serial.println(' ');
   Serial.print("RECEIVED ");
-  Serial.println(receivedOK);
+  Serial.println(EEPROM.read(0));
   Serial.println(' ');
   delay(2);
   //sendLED(0);
@@ -435,6 +443,10 @@ void doMeasure() {
   }
   measure.lpg = (val/20.0) * 10;
 #endif
+
+#ifdef RELAY
+  measure.relay = EEPROM.read(relay_eeprom_addr);
+#endif
 }
 
 
@@ -513,7 +525,11 @@ void loop() {
 #else
   vcc = battVolts();
 #endif
-  
+
+#ifdef RELAY
+  relay.digiWrite(EEPROM.read(0));
+#endif
+ 
   if (vcc <= VCC_FINAL) { // ostatni mozliwy pakiet
     sendPayload();
     vcc = 1; // don't even try reading VCC after this send
@@ -529,13 +545,13 @@ void loop() {
     #ifndef DEV_MODE
       //Sleepy::loseSomeTime(60000);
       for (int i = 0; i < 60000/70; ++i) {
-        Sleepy::loseSomeTime(70);
+        Sleepy::loseSomeTime(10);
         doReceive();
       }
     #else
       //Sleepy::loseSomeTime(6000);
       for (int i = 0; i < 6000/70; ++i) {
-        Sleepy::loseSomeTime(70);
+        Sleepy::loseSomeTime(10);
         doReceive();
       }
     #endif
