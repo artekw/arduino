@@ -37,6 +37,11 @@
   #define LPG
 #endif
 
+#if NODEID == peper
+  #define RFM69 1
+  #define BOARD_REV 4
+  #define SOIL
+#endif
 
 // others
 

@@ -10,6 +10,7 @@
 #define foliowiec		4
 #define babcia      6
 #define garaz			  19
+#define pepper      20
 
 // out
 
