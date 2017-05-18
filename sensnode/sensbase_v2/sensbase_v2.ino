@@ -1,6 +1,6 @@
 // sensbase v2.0
 
-#define RF69_COMPAT 1
+#define RF69_COMPAT 0
 
 #include <JeeLib.h>
 
@@ -9,10 +9,10 @@
 #define BINARY 1 // rf12demo https://github.com/jcw/jeelib/blob/master/examples/RF12/RF12demo/RF12demo.ino
 #define DEBUG 0
 
-static byte ACT_LED       = 13;
-static byte NODEID        = 29;  // 31 for any node(all)
+static byte ACT_LED       = 9; 13 or 9
+static byte NODEID        = 31;  // 31 for any node(all)
 static byte NETWORK       = 210; // 0-255
-static int BAUD           = 115200; // serial speed
+static int BAUD           = 9600; // serial speed
 
 /*************************************************************/
 char ramka[5];

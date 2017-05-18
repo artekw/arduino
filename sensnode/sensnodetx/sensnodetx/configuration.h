@@ -2,7 +2,7 @@
 #define CONFIGURATION_H
 
 //************ RADIO MODULE *************
-#define NODEID              babcia    // name of node - look nodes.h
+#define NODEID              foliowiec    // name of node - look nodes.h
 #define NETWORK             210
 #define BAND                433   // (433 or 868)
 // #define LOWRATE                // use on sensbase too !!
@@ -25,7 +25,7 @@
 //#define AIRQ                  	 // Air Quality - MQ-135 eg. FC-22
 //#define LPG                      // LPG - MQ-6
 
-// #define RELAY                      // SSR Relay
+ //#define RELAY                      // SSR Relay
 //*********** OTHER ******************
 #define LED_ON                 // use act led for transmission
 //#define OLED

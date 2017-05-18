@@ -216,6 +216,7 @@ void doReceive() {
     }
   }
 
+#ifdef RELAY
   if (rxdata.destnode == NODEID) {
     // Custom commands
     // eg. ON/OFF SSR Relay
@@ -233,6 +234,7 @@ void doReceive() {
       }
     }
   }
+#endif
 }
 
 
@@ -543,16 +545,22 @@ void loop() {
   
   while (minutes-- > 0)
     #ifndef DEV_MODE
-      //Sleepy::loseSomeTime(60000);
-      for (int i = 0; i < 60000/70; ++i) {
-        Sleepy::loseSomeTime(10);
-        doReceive();
-      }
+      #ifndef RELAY
+        Sleepy::loseSomeTime(60000);
+      #else
+        for (int i = 0; i < 60000/70; ++i) {
+          Sleepy::loseSomeTime(10);
+          doReceive();
+        }
+      #endif
     #else
-      //Sleepy::loseSomeTime(6000);
-      for (int i = 0; i < 6000/70; ++i) {
-        Sleepy::loseSomeTime(10);
-        doReceive();
-      }
+      #ifndef RELAY
+        Sleepy::loseSomeTime(6000);
+      #else
+        for (int i = 0; i < 6000/70; ++i) {
+          Sleepy::loseSomeTime(10);
+          doReceive();
+        }
+      #endif
     #endif
 }

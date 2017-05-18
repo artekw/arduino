@@ -7,7 +7,7 @@
 
 #define artekroom		2
 #define kamilroom		5
-#define salon			  4
+#define foliowiec		4
 #define babcia      6
 #define garaz			  19
 

@@ -17,10 +17,10 @@
 	#define BMP_SENSOR
 #endif
 
-#if NODEID == salon
-  #define RFM69 1
-  #define BOARD_REV 4
-  #define SHT21_SENSOR
+#if NODEID == foliowiec
+  #define RFM69 0
+  #define BOARD_REV 2
+  #define DS18B20
 #endif
 
 #if NODEID == babcia
